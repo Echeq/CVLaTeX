@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The README demo is encoded at 720p/30 fps so GitHub can preview it inline;
+  the original 1080p recording stays outside the repository.
+
 ## [1.0.0] - 2026-11-22
 
 ### Added

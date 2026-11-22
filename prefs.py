@@ -1,14 +1,15 @@
 """User preferences in the per-OS application data directory.
 
-Windows keeps %LOCALAPPDATA%\\CVLaTex\\prefs.json; macOS uses
-~/Library/Application Support/CVLaTex and other systems follow the XDG base
-directory spec ($XDG_DATA_HOME or ~/.local/share) + /CVLaTex.
+Windows keeps %LOCALAPPDATA%\\CVLaTeX\\prefs.json; macOS uses
+~/Library/Application Support/CVLaTeX and other systems follow the XDG base
+directory spec ($XDG_DATA_HOME or ~/.local/share) + /CVLaTeX.
 
 Las claves son inglesas desde la migracion: paper, margins, font_size,
-auto_compile, breakpoint, latex_path, setup_dismissed, theme, colors, split,
-ui_language y ui_language_chosen. load() migra una sola vez los ficheros
-escritos con las claves antiguas en espanol y guarda una copia prefs.json.bak
-que nunca se pisa.
+font_style, units, auto_compile, breakpoint, layout_mode, latex_path,
+tinytex_url, setup_dismissed, theme, colors, split, split_vertical,
+ui_language y ui_language_chosen. load() migra una sola vez los
+ficheros escritos con las claves antiguas en espanol y guarda una copia
+prefs.json.bak que nunca se pisa.
 """
 
 import json
@@ -16,12 +17,12 @@ import os
 import shutil
 import sys
 
-APP_NAME = "CVLaTex"
-LEGACY_APP_NAME = "CVLaTeX"
+APP_NAME = "CVLaTeX"
+LEGACY_APP_NAME = "CVLaTex"
 
 
 def _app_dir_for(platform=None, env=None, home=None, app_name=APP_NAME):
-    """Application data directory (with the CVLaTex subfolder) for a platform.
+    """Application data directory (with the CVLaTeX subfolder) for a platform.
 
     Pure function so the per-OS paths are unit-testable: `platform` defaults
     to `sys.platform`, `env` to `os.environ` and `home` to the user home.
@@ -39,28 +40,59 @@ def _app_dir_for(platform=None, env=None, home=None, app_name=APP_NAME):
 
 
 def legacy_app_dir(app_dir=None):
-    """Return the pre-0.3.0 CVLaTeX data directory next to the current one."""
+    """Return the previous CVLaTex data directory next to the current one."""
     current = APP_DIR if app_dir is None else app_dir
     return os.path.join(os.path.dirname(current), LEGACY_APP_NAME)
 
 
 def migrate_legacy_app_dir():
-    """Move the old CVLaTeX data directory to CVLaTex once.
+    """Bring data from the previous CVLaTex directory into CVLaTeX.
 
-    Returns True when the legacy directory was moved. Does nothing when the
-    new directory already exists or there is no legacy directory to move.
+    If CVLaTeX does not exist yet the old directory is moved (preserving
+    TinyTeX and cache). If both exist, only missing small state files are
+    copied; current data is never overwritten. The old directory is left in
+    place so its TinyTeX installation remains detectable.
+
+    Returns True when something was moved or copied.
     """
     legacy = legacy_app_dir()
     if os.path.abspath(legacy) == os.path.abspath(APP_DIR):
         return False
-    if os.path.exists(APP_DIR) or not os.path.isdir(legacy):
+    if not os.path.isdir(legacy):
         return False
-    try:
-        os.makedirs(os.path.dirname(APP_DIR), exist_ok=True)
-        shutil.move(legacy, APP_DIR)
-        return True
-    except OSError:
-        return False
+    if not os.path.exists(APP_DIR):
+        try:
+            os.makedirs(os.path.dirname(APP_DIR), exist_ok=True)
+            shutil.move(legacy, APP_DIR)
+            return True
+        except OSError:
+            return False
+    copied = False
+    for name in (
+        "prefs.json",
+        "prefs.json.bak",
+        "autosave.cvjson",
+        "autosave.cvjson.bak",
+        "autosave.cvjson.tmp",
+    ):
+        source = os.path.join(legacy, name)
+        target = os.path.join(APP_DIR, name)
+        if not os.path.isfile(source):
+            continue
+        if os.path.isfile(target):
+            continue
+        try:
+            os.makedirs(APP_DIR, exist_ok=True)
+            shutil.copy2(source, target)
+            copied = True
+        except OSError:
+            continue
+    return copied
+
+
+def default_app_dir():
+    """The default per-OS app directory, even if APP_DIR is redirected."""
+    return _app_dir_for()
 
 
 APP_DIR = _app_dir_for()
@@ -73,15 +105,27 @@ DEFAULTS = {
     "paper": "a4",
     "margins": {"top": 2.0, "bottom": 2.0, "left": 2.0, "right": 2.0},
     "font_size": 11,
+    # "" keeps the template's own typography; serif/sans/mono override the
+    # default family in the PDF and the Word export.
+    "font_style": "",
+    # Measurement unit for the photo width/height fields: cm or in.
+    "units": "cm",
     "auto_compile": True,
     "breakpoint": 960,
+    # "side" (default) and "stacked" are the simple button modes; "auto"
+    # stacks on narrow/portrait windows and is available as an advanced option.
+    "layout_mode": "side",
     "latex_path": None,
+    # Optional direct URL for the TinyTeX archive (trusted mirror/proxy).
+    "tinytex_url": "",
     "setup_dismissed": False,
     "theme": "system",
     # Document palette: "#RRGGBB" values or "" (empty = the template's own
     # color). "text" tints the whole PDF body.
     "colors": {"primary": "", "secondary": "", "text": "", "gray": ""},
     "split": 50,
+    # Preview height (%) when the window is stacked (preview top, form below).
+    "split_vertical": 50,
     "ui_language": "en",
     "ui_language_chosen": False,
 }

@@ -11,6 +11,7 @@ Chinese three-column line), its bullet marker and palette-aware separators.
 """
 
 import os
+from dataclasses import replace
 
 from docx import Document
 from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
@@ -891,11 +892,19 @@ def _add_contacts(container, d, L, palette, profile=None, align=None, before_pt=
     return paragraph
 
 
-def _header_images(d):
-    """(logo path, photo path) of the data; empty strings when unusable."""
+def _header_images(d, include_logo=None, include_photo=True):
+    """(logo path, photo path) of the data.
+
+    The school logo joins the media column only when it is placed on the right
+    (and the template has a media column); a left-corner logo is a letterhead
+    paragraph above the header. Harvard ignores the photo because its centred
+    layout looks better without one.
+    """
+    if include_logo is None:
+        include_logo = _logo_side(d) == "right"
     return (
-        _valid_image(_value(d, "school_logo"), LOGO_EXTS),
-        _valid_image(_value(d, "photo"), PHOTO_EXTS),
+        _valid_image(_value(d, "school_logo"), LOGO_EXTS) if include_logo else "",
+        _valid_image(_value(d, "photo"), PHOTO_EXTS) if include_photo else "",
     )
 
 
@@ -912,15 +921,14 @@ def _photo_box_cm(d, profile, total_cm):
 
 
 def _logo_box_cm(d, profile, photo_width_cm):
-    """Logo box: the profile ratio of the photo, never above 6x4cm."""
+    """Logo box from the user's cm values, capped to the media column."""
     width = _clamp_number(
-        _value(d, "school_logo_width_cm"), DEFAULT_LOGO_WIDTH, 0.5, MAX_LOGO_WIDTH_CM,
+        _value(d, "school_logo_width_cm"), 4.0, 0.5, 4.0,
     )
     height = _clamp_number(
-        _value(d, "school_logo_height_cm"), DEFAULT_LOGO_HEIGHT, 0.3, MAX_LOGO_HEIGHT_CM,
+        _value(d, "school_logo_height_cm"), 1.5, 0.3, 2.0,
     )
-    ratio_width = max(float(profile.logo_ratio) * float(photo_width_cm), 0.5)
-    return min(width, ratio_width, MAX_LOGO_WIDTH_CM), height
+    return width, height
 
 
 def _new_header_table(doc, widths_cm, align=None):
@@ -940,6 +948,28 @@ def _cell_top(cell):
         cell.vertical_alignment = WD_ALIGN_VERTICAL.TOP
     except Exception:
         pass
+
+
+def _logo_side(d):
+    """'left' or 'right' corner for the school logo."""
+    return "right" if _text(_value(d, "school_logo_side")).lower() == "right" else "left"
+
+
+def _add_school_logo(doc, d, align=WD_ALIGN_PARAGRAPH.LEFT):
+    """Letterhead logo above the header table, using the user's cm size."""
+    logo = _valid_image(_value(d, "school_logo"), LOGO_EXTS)
+    if not logo:
+        return None
+    width = _clamp_number(_value(d, "school_logo_width_cm"), 4.0, 0.5, 4.5)
+    height = _clamp_number(_value(d, "school_logo_height_cm"), 1.5, 0.3, 2.5)
+    paragraph = doc.add_paragraph()
+    _zero_spacing(paragraph, 0, 3)
+    try:
+        paragraph.alignment = align
+    except Exception:
+        pass
+    _insert_picture(paragraph, logo, _fit_width_cm(logo, width, height))
+    return paragraph
 
 
 def _add_logo(container, path, width_cm, height_cm, align, before_pt=0.0):
@@ -1003,7 +1033,7 @@ def _header_rule(doc, color_hex, size_pt, space_pt=1.0, gap_before_pt=0.0):
 
 
 def _header_classic(doc, d, L, palette, profile):
-    """Name + contacts left, logo above the framed photo right, accent rule."""
+    """Name + contacts left, framed photo right, accent rule."""
     total = _text_width_cm(doc)
     logo, photo = _header_images(d)
     has_right = bool(logo or photo)
@@ -1043,9 +1073,13 @@ def _header_classic(doc, d, L, palette, profile):
 
 
 def _header_harvard(doc, d, L, palette, profile):
-    """Centred small-caps name, contacts, logo/photo and a gray double hairline."""
+    """Centred small-caps name, contacts and a gray double hairline.
+
+    Harvard is deliberately photo-free: a centred portrait below the contacts
+    made the header tall and visually detached from the name.
+    """
     total = _text_width_cm(doc)
-    logo, photo = _header_images(d)
+    logo, photo = _header_images(d, include_logo=False, include_photo=False)
     table = _new_header_table(doc, (total,), WD_TABLE_ALIGNMENT.CENTER)
     cell = table.cell(0, 0)
     _cell_top(cell)
@@ -1068,8 +1102,6 @@ def _header_harvard(doc, d, L, palette, profile):
     )
 
     photo_width, photo_height = _photo_box_cm(d, profile, total)
-    # PDF order: the framed photo first, then the school logo centred under it
-    # with a 0.15em gap (1.65pt at the 11pt body size).
     if photo:
         _add_framed_photo(
             cell, photo, photo_width, photo_height, palette,
@@ -1223,8 +1255,13 @@ def _em_cm(em, pt):
 
 
 def _family_for(profile):
-    """Explicit Word font family of the profile (serif or sans)."""
-    return SANS_FONT if _text(profile.font_family).lower() == "sans" else SERIF_FONT
+    """Explicit Word font family of the profile (serif, sans or mono)."""
+    family = _text(profile.font_family).lower()
+    if family == "mono":
+        return MONO_FONT
+    if family == "sans":
+        return SANS_FONT
+    return SERIF_FONT
 
 
 def _run_font(run, family):
@@ -1244,7 +1281,8 @@ def _contact_groups(d, L):
 
     Every item is ``(label, value, mono)``: the phone and the e-mail carry
     ``mono=True`` because the playful header sets their values in a monospace
-    face, exactly like the ``\\texttt`` of the LaTeX contact lines.
+    face, exactly like the ``\\texttt`` of the LaTeX contact lines. The school
+    logo is a letterhead image above the header, not a contact-line mark.
     """
     personal = []
 
@@ -1672,7 +1710,8 @@ def _add_bar_photo(container, path, width_cm, inner_cm, pad_cm, align):
     return inserted
 
 
-def _sidebar_contacts(container, d, L, size_pt=8.0, before_pt=0.0, pad_cm=0.8):
+def _sidebar_contacts(container, d, L, size_pt=8.0, before_pt=0.0, pad_cm=0.8,
+                      family=SERIF_FONT):
     """White contact lines of the sidebar bar, one pair per line.
 
     The order matches every other header: phone, e-mail, address, school,
@@ -1709,7 +1748,7 @@ def _sidebar_contacts(container, d, L, size_pt=8.0, before_pt=0.0, pad_cm=0.8):
         for run in (label_run, value_run):
             run.font.size = size
             run.font.color.rgb = white
-            _run_font(run, SERIF_FONT)
+            _run_font(run, family)
     return pairs
 
 
@@ -1795,15 +1834,18 @@ def _header_sidebar(doc, d, L, palette, profile):
     # --- accent bar -------------------------------------------------------
     _cell_top(bar)
     docx_shapes.shade_cell(bar, palette.role_hex("accent"))
-    logo, photo = _header_images(d)
+    logo, photo = _header_images(d, include_logo=True)
     total_width = max(page_width - left_margin - right_margin, 3.0)
     photo_width, _photo_height = _photo_box_cm(d, profile, total_width)
     if logo:
-        logo_width, logo_height = _logo_box_cm(
-            d, profile, min(photo_width, inner_cm),
+        logo_width = _clamp_number(
+            _value(d, "school_logo_width_cm"), 4.0, 0.5, 4.2,
+        )
+        logo_height = _clamp_number(
+            _value(d, "school_logo_height_cm"), 1.5, 0.3, 2.2,
         )
         _add_logo(
-            bar, logo, min(logo_width, inner_cm), logo_height,
+            bar, logo, _fit_width_cm(logo, logo_width, logo_height), logo_height,
             WD_ALIGN_PARAGRAPH.CENTER,
         )
     if photo:
@@ -1816,6 +1858,7 @@ def _header_sidebar(doc, d, L, palette, profile):
     _sidebar_contacts(
         bar, d, L, size_pt=max(_normal_font_size(bar) - 3.0, 7.0),
         before_pt=6.0 if has_images else 0.0, pad_cm=pad_cm,
+        family=_family_for(profile),
     )
     _shrink_empty_paragraphs(bar)
 
@@ -2323,6 +2366,17 @@ def _add_header(doc, d, L, palette, profile=None):
     """
     profile = _profile_or_default(profile)
     _apply_page_frame(doc, palette, profile)
+    if profile.template not in ("sidebar", "sidebar-right"):
+        # A right-corner logo already lives in the header's media column; only
+        # the left corner (and Harvard, which has no media column) needs the
+        # letterhead paragraph above the table.
+        if _logo_side(d) == "left" or profile.template in latex_gen.TEMPLATES_WITHOUT_PHOTO:
+            _add_school_logo(
+                doc, d,
+                WD_ALIGN_PARAGRAPH.RIGHT
+                if _logo_side(d) == "right"
+                else WD_ALIGN_PARAGRAPH.LEFT,
+            )
     builder = _HEADER_BUILDERS.get(profile.template)
     if builder is None:
         _header_generic(doc, d, L, palette, profile)
@@ -3214,7 +3268,7 @@ def _configure_document(doc, prefs_dict, profile=None):
     section.right_margin = Cm(_number(_value(margins, "right"), DEFAULT_MARGIN))
 
     size = _number(_value(p, "font_size"), DEFAULT_FONT_SIZE)
-    family = SANS_FONT if _text(profile.font_family).lower() == "sans" else SERIF_FONT
+    family = _family_for(profile)
 
     # Document default rPr: runs inherit the explicit fonts (and size).
     default_r_pr, _ = _document_defaults(doc)
@@ -3803,8 +3857,9 @@ def export(data, prefs_dict, path):
     """Export `data` to a DOCX file at `path`.
 
     `prefs_dict` uses the same keys as prefs.load(): paper, margins,
-    font_size and colors (primary, secondary, text, gray). The palette falls
-    back to the colors of the selected LaTeX template, so a default export is
+    font_size, font_style and colors (primary, secondary, text, gray). The
+    font style overrides the template's family (serif/sans/mono). The palette
+    falls back to the colors of the selected LaTeX template, so a default export is
     visually the same design as the PDF. Every template renders its own
     heading shape, entry line family and bullet marker; the Latin templates
     also honour ``data["columns"]`` (1-3) as a balanced fixed table.
@@ -3816,6 +3871,9 @@ def export(data, prefs_dict, path):
     except Exception:
         L = LANG["zh"]
     profile = docx_profiles.profile_for(_template_id(data))
+    style = _text(_value(prefs_dict, "font_style")).lower()
+    if style in ("serif", "sans", "mono"):
+        profile = replace(profile, font_family=style)
     doc = Document()
     _configure_document(doc, prefs_dict or {}, profile)
     palette = _build_palette(data, prefs_dict)

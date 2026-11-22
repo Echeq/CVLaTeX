@@ -1,6 +1,6 @@
 "use strict";
 
-/* CVLaTex frontend. All user-visible strings come from web/i18n.js through
+/* CVLaTeX frontend. All user-visible strings come from web/i18n.js through
    `t()`; identifiers and comments are English. The bridge calls mirror the
    frozen Api surface of main.py, including its Spanish envelope keys
    (`errores`, `ruta`, `cancelado`, ...), which are part of the wire format. */
@@ -61,6 +61,8 @@ const state = {
   preview: { state: "idle" },
   pdfViewer: false,
   pdfTimeout: null,
+  // Sections the user explicitly added from Add, even before they have data.
+  showSections: {},
 };
 
 let emptyData = null;
@@ -87,6 +89,10 @@ const TEMPLATES_CV = [
 ];
 
 const THEMES = ["light", "dark", "system"];
+
+/* Templates whose header is intentionally photo-free (Harvard's centred
+   academic layout looks better without a portrait). */
+const TEMPLATES_WITHOUT_PHOTO = new Set(["harvard"]);
 
 const COLOR_FIELDS = ["primary", "secondary", "text", "gray"];
 
@@ -274,6 +280,15 @@ function isSectionHidden(key) {
   return Array.isArray(hidden) && hidden.indexOf(key) >= 0;
 }
 
+function sectionHasContent(key) {
+  if (!state.data) return false;
+  if (key === "summary") {
+    return String(state.data.summary || "").trim().length > 0;
+  }
+  const list = state.data[key];
+  return Array.isArray(list) && list.length > 0;
+}
+
 // Free block anchors: start + standard sections in their current order + end.
 function blockAnchorsUI() {
   return ["start"].concat(sectionOrder(), ["end"]);
@@ -317,6 +332,30 @@ let _confirmCancel = null;
 // for every other confirm dialog, which shows just accept/cancel.
 let _confirmExit = null;
 
+/* Set by setupSplitter(). Any modal can interrupt a drag (the native close
+   guard can arrive mid-drag), and a stuck `body.resizing` overlay sits above
+   the modal with z-index 80, so clicks never reach its buttons. */
+let _splitterRelease = null;
+
+function stopSplitterDrag() {
+  if (_splitterRelease) {
+    _splitterRelease();
+    return;
+  }
+  document.body.classList.remove("resizing", "resizing-vertical");
+}
+
+function focusConfirmPrimary() {
+  const button = $("#confirm-accept");
+  if (button && !button.hidden) {
+    try {
+      button.focus({ preventScroll: true });
+    } catch (e) {
+      button.focus();
+    }
+  }
+}
+
 function resetConfirmLabels() {
   $("#confirm-accept").textContent = t("confirm_ok");
   $("#confirm-cancel").textContent = t("cancel");
@@ -338,6 +377,7 @@ function closeModal(modal) {
 }
 
 function askConfirm(message, onAccept, onCancel, acceptLabel, cancelLabel) {
+  stopSplitterDrag();
   _confirmExit = null;
   $("#confirm-message").textContent = message;
   _confirmAccept = onAccept || null;
@@ -348,6 +388,7 @@ function askConfirm(message, onAccept, onCancel, acceptLabel, cancelLabel) {
   $("#confirm-exit").hidden = true;
   $("#confirm-cancel").hidden = false;
   $("#modal-confirm").hidden = false;
+  focusConfirmPrimary();
 }
 
 function showAlert(message) {
@@ -431,6 +472,7 @@ function runAction(action, e) {
   else if (action.startsWith("template:")) applyTemplate(action.split(":")[1]);
   else if (action.startsWith("zoom:")) applyZoom(Number(action.split(":")[1]));
   else if (action.startsWith("toggle:")) toggleOption(action.split(":")[1]);
+  else if (action.startsWith("add:sect:")) addSection(action.slice("add:sect:".length));
   else if (action.startsWith("add:columns:")) {
     openListBlockModal("columns", null, Number(action.split(":")[2]));
   }
@@ -455,6 +497,8 @@ function runAction(action, e) {
       case "add:block-space": createSeparatorBlock("space"); break;
       case "add:section": openCustomSectionModal(null); break;
       case "add:period": openListBlockModal("period", null); break;
+      case "add:socials": addOptionalSection("socials"); break;
+      case "add:extra": addOptionalSection("extra_fields"); break;
       case "manage-blocks": openBlocksModal(); break;
       case "help": $("#modal-help").hidden = false; break;
       case "credits": $("#modal-credits").hidden = false; break;
@@ -484,6 +528,7 @@ async function newCv() {
   askConfirm(t("confirm_new"), () => {
     if (state.mode === "latex") exitLatexMode(false);
     state.data = JSON.parse(JSON.stringify(emptyData));
+    state.showSections = {};
     state.filePath = null;
     clearHistory();
     renderForm();
@@ -501,6 +546,7 @@ async function openCv() {
     const apply = () => {
       if (state.mode === "latex") exitLatexMode(false);
       state.data = r.datos;
+      state.showSections = {};
       state.filePath = r.ruta || null;
       clearHistory();
       renderForm();
@@ -635,6 +681,7 @@ async function importTex() {
     const apply = () => {
       if (state.mode === "latex") exitLatexMode(false);
       state.data = r.datos;
+      state.showSections = {};
       state.filePath = null;
       clearHistory();
       renderForm();
@@ -667,6 +714,7 @@ async function loadSample() {
     state.data.template = TEMPLATES_CV.some((tpl) => tpl.value === activeTemplate)
       ? activeTemplate
       : "classic";
+    state.showSections = {};
     state.filePath = null;
     clearHistory();
     renderForm();
@@ -714,6 +762,7 @@ function applyTemplate(value) {
   state.data.template = valid ? value : "classic";
   markDirty(true);
   updateMarks();
+  renderForm();
 }
 
 function toggleOption(option) {
@@ -947,6 +996,7 @@ async function clearAutosave() {
 window.__onCloseRequest = function () {
   // The dirty close guard has exactly three buttons: save+exit (primary),
   // exit without saving (keeps the restore point) and cancel.
+  stopSplitterDrag();
   _confirmAccept = saveAndExit;
   _confirmExit = exitWithoutSaving;
   _confirmCancel = null;
@@ -958,6 +1008,7 @@ window.__onCloseRequest = function () {
   $("#confirm-cancel").hidden = false;
   $("#confirm-cancel").textContent = t("cancel");
   $("#modal-confirm").hidden = false;
+  focusConfirmPrimary();
 };
 
 /* ---------------- undo / redo ---------------- */
@@ -1206,7 +1257,19 @@ function sectionCard(text, key, standard) {
       renderForm();
     });
 
-    controls.append(visibility, up, down);
+    const remove = document.createElement("button");
+    remove.className = "section-remove-button";
+    remove.textContent = "✕";
+    remove.title = t("remove_section");
+    remove.addEventListener("click", (e) => {
+      e.stopPropagation();
+      askConfirm(
+        t("confirm_remove_section").replace("{section}", text),
+        () => removeSection(key, text)
+      );
+    });
+
+    controls.append(visibility, up, down, remove);
     header.appendChild(controls);
   }
   const content = document.createElement("div");
@@ -1221,6 +1284,31 @@ function sectionCard(text, key, standard) {
     toggleCollapse("sections", collapseKey, card);
   });
   return card;
+}
+
+function removeSection(key, label) {
+  if (!state.data) return;
+  recordHistory(true);
+  if (key === "summary") {
+    state.data.summary = "";
+  } else if (Array.isArray(state.data[key])) {
+    state.data[key] = [];
+  }
+  if (state.data.section_titles && typeof state.data.section_titles === "object") {
+    delete state.data.section_titles[key];
+  }
+  if (state.data.columns && typeof state.data.columns === "object") {
+    delete state.data.columns[key];
+  }
+  if (Array.isArray(state.data.hidden_sections)) {
+    state.data.hidden_sections = state.data.hidden_sections.filter(
+      (value) => value !== key
+    );
+  }
+  if (state.showSections) delete state.showSections[key];
+  markDirty(true);
+  renderForm();
+  toast(t("toast_section_removed").replace("{section}", label));
 }
 
 function basicField(key, label, area) {
@@ -1290,7 +1378,38 @@ function paintPhoto() {
   if (button) button.hidden = false;
 }
 
+function unitName() {
+  return state.prefs && state.prefs.units === "in" ? "in" : "cm";
+}
+
+function cmToUnit(value) {
+  const number = Number(value) || 0;
+  return unitName() === "in"
+    ? Math.round((number / 2.54) * 100) / 100
+    : Math.round(number * 100) / 100;
+}
+
+function unitToCm(value) {
+  const number = Number(value) || 0;
+  return unitName() === "in" ? number * 2.54 : number;
+}
+
+function templateSupportsPhoto() {
+  return !TEMPLATES_WITHOUT_PHOTO.has(
+    (state.data && state.data.template) || "classic"
+  );
+}
+
 function photoRow() {
+  if (!templateSupportsPhoto()) {
+    const notice = document.createElement("div");
+    notice.className = "field wide";
+    const hint = document.createElement("p");
+    hint.className = "form-hint";
+    hint.textContent = t("photo_not_supported");
+    notice.appendChild(hint);
+    return notice;
+  }
   const row = document.createElement("div");
   row.className = "photo-row";
   const view = document.createElement("div");
@@ -1319,33 +1438,40 @@ function photoRow() {
 
   const size = document.createElement("div");
   size.className = "photo-size";
-  const widthLabel = document.createElement("label");
-  widthLabel.textContent = t("width_cm");
+  const unit = unitName();
+  const widthGroup = document.createElement("label");
+  widthGroup.className = "size-field";
+  const widthLabel = document.createElement("span");
+  widthLabel.textContent = t("width_label") + " (" + unit + ")";
   const widthInput = document.createElement("input");
   widthInput.type = "number";
-  widthInput.min = "1";
-  widthInput.max = "12";
-  widthInput.step = "0.5";
-  const heightLabel = document.createElement("label");
-  heightLabel.textContent = t("height_cm");
+  widthInput.min = unit === "in" ? "0.4" : "1";
+  widthInput.max = unit === "in" ? "4.7" : "12";
+  widthInput.step = unit === "in" ? "0.1" : "0.5";
+  widthGroup.append(widthLabel, widthInput);
+  const heightGroup = document.createElement("label");
+  heightGroup.className = "size-field";
+  const heightLabel = document.createElement("span");
+  heightLabel.textContent = t("height_label") + " (" + unit + ")";
   const heightInput = document.createElement("input");
   heightInput.type = "number";
-  heightInput.min = "1";
-  heightInput.max = "15";
-  heightInput.step = "0.5";
-  size.append(widthLabel, widthInput, heightLabel, heightInput);
+  heightInput.min = unit === "in" ? "0.4" : "1";
+  heightInput.max = unit === "in" ? "5.9" : "15";
+  heightInput.step = unit === "in" ? "0.1" : "0.5";
+  heightGroup.append(heightLabel, heightInput);
+  size.append(widthGroup, heightGroup);
 
   controls.append(label, buttons, size);
   row.append(view, controls);
 
   const updateSize = () => {
-    widthInput.value = Number(state.data.photo_width_cm) || 4;
-    heightInput.value = Number(state.data.photo_height_cm) || 5;
+    widthInput.value = cmToUnit(Number(state.data.photo_width_cm) || 4);
+    heightInput.value = cmToUnit(Number(state.data.photo_height_cm) || 5);
   };
   const applySize = () => {
     recordHistory(false);
-    state.data.photo_width_cm = Number(widthInput.value) || 4;
-    state.data.photo_height_cm = Number(heightInput.value) || 5;
+    state.data.photo_width_cm = unitToCm(widthInput.value) || 4;
+    state.data.photo_height_cm = unitToCm(heightInput.value) || 5;
     markDirty(true);
   };
   widthInput.addEventListener("change", () => { applySize(); paintPhoto(); });
@@ -1396,11 +1522,41 @@ function photoRow() {
 
 /* ---------------- photo crop ---------------- */
 
-let _crop = { img: null, container: null, box: null };
+let _crop = { img: null, container: null, box: null, mode: "photo", ratio: null };
 
-function openCrop() {
-  const source = state.data.photo_original || state.data.photo;
+function populateCropRatios(isLogo) {
+  const select = $("#crop-ratio");
+  select.innerHTML = "";
+  const options = isLogo
+    ? [["2", "2:1"], ["3", "3:1"], ["4", "4:1"]]
+    : [
+        ["free", t("crop_ratio_free")],
+        ["1", "1:1"],
+        ["0.8", "4:5"],
+        ["0.75", "3:4"],
+      ];
+  options.forEach(([value, label]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    select.appendChild(option);
+  });
+  select.value = isLogo ? "3" : "free";
+}
+
+function openCrop(mode = "photo") {
+  const isLogo = mode === "logo";
+  const source = isLogo
+    ? state.data.school_logo_original || state.data.school_logo
+    : state.data.photo_original || state.data.photo;
   if (!source) return;
+  _crop.mode = isLogo ? "logo" : "photo";
+  _crop.ratio = isLogo ? 3 : null;
+  populateCropRatios(isLogo);
+  $("#modal-crop h2").textContent = t(isLogo ? "crop_logo_title" : "crop_title");
+  $("#modal-crop .modal-box > p").textContent = t(
+    isLogo ? "crop_logo_help" : "crop_help"
+  );
   const img = new Image();
   img.onload = () => {
     _crop.img = img;
@@ -1411,6 +1567,35 @@ function openCrop() {
   img.src = "/media/" + encodeURIComponent(source.split(/[\\/]/).pop());
 }
 
+function resetCropToRatio(ratio) {
+  const container = _crop.container;
+  const box = _crop.box;
+  if (!container || !box) return;
+  const cw = container.clientWidth;
+  const ch = container.clientHeight;
+  const imageRatio = cw / Math.max(ch, 1);
+  let bw;
+  let bh;
+  if (imageRatio >= ratio) {
+    bh = 1;
+    bw = ratio / imageRatio;
+  } else {
+    bw = 1;
+    bh = imageRatio / ratio;
+  }
+  const current = {
+    x: parseFloat(box.style.left) || 0,
+    y: parseFloat(box.style.top) || 0,
+    w: parseFloat(box.style.width) || cw,
+    h: parseFloat(box.style.height) || ch,
+  };
+  const cx = (current.x + current.w / 2) / cw;
+  const cy = (current.y + current.h / 2) / ch;
+  const x = Math.min(Math.max(cx - bw / 2, 0), 1 - bw);
+  const y = Math.min(Math.max(cy - bh / 2, 0), 1 - bh);
+  placeCropBox(x * cw, y * ch, bw * cw, bh * ch);
+}
+
 function placeCropBox(x, y, w, h) {
   const box = _crop.box;
   if (!box) return;
@@ -1418,6 +1603,22 @@ function placeCropBox(x, y, w, h) {
   box.style.top = y + "px";
   box.style.width = w + "px";
   box.style.height = h + "px";
+}
+
+function logoCropRect(w, h) {
+  if (state.data.school_logo_crop) return state.data.school_logo_crop;
+  const ratio = _crop.ratio || 3;
+  const imageRatio = w / Math.max(h, 1);
+  let bw;
+  let bh;
+  if (imageRatio >= ratio) {
+    bh = 1;
+    bw = ratio / imageRatio;
+  } else {
+    bw = 1;
+    bh = imageRatio / ratio;
+  }
+  return { x: (1 - bw) / 2, y: (1 - bh) / 2, w: bw, h: bh };
 }
 
 function mountCrop() {
@@ -1446,8 +1647,27 @@ function mountCrop() {
   _crop.container = container;
   _crop.box = box;
 
-  const rect = state.data.photo_crop || { x: 0, y: 0, w: 1, h: 1 };
-  placeCropBox(rect.x * w, rect.y * h, Math.max(24, rect.w * w), Math.max(24, rect.h * h));
+  const rect = _crop.mode === "logo"
+    ? logoCropRect(w, h)
+    : state.data.photo_crop || { x: 0, y: 0, w: 1, h: 1 };
+  if (_crop.mode === "logo" && state.data.school_logo_crop) {
+    const saved = state.data.school_logo_crop;
+    const pixelRatio = (saved.w * w) / Math.max(saved.h * h, 1);
+    const nearest = [2, 3, 4].reduce(
+      (best, value) => (Math.abs(value - pixelRatio) < Math.abs(best - pixelRatio) ? value : best),
+      3
+    );
+    _crop.ratio = nearest;
+    $("#crop-ratio").value = String(nearest);
+  }
+  const boxW = rect.w * w;
+  const boxH = rect.h * h;
+  placeCropBox(
+    rect.x * w,
+    rect.y * h,
+    _crop.mode === "logo" ? boxW : Math.max(24, boxW),
+    _crop.mode === "logo" ? boxH : Math.max(24, boxH)
+  );
   bindCrop();
 }
 
@@ -1461,6 +1681,7 @@ function bindCrop() {
     const handle = e.target.closest(".crop-handle");
     const containerWidth = container.clientWidth;
     const containerHeight = container.clientHeight;
+    const ratio = _crop.ratio;
     const startX = e.clientX;
     const startY = e.clientY;
     const rect = {
@@ -1478,6 +1699,34 @@ function bindCrop() {
           clamp(rect.y + dy, 0, containerHeight - rect.h),
           rect.w,
           rect.h
+        );
+      } else if (ratio) {
+        // Logo mode: resizing keeps the wide 3:1 crop locked. The opposite
+        // corner stays anchored, so the selected area only grows or shrinks.
+        const east = handle.dataset.corner.includes("e");
+        const south = handle.dataset.corner.includes("s");
+        const anchorX = east ? rect.x : rect.x + rect.w;
+        const anchorY = south ? rect.y : rect.y + rect.h;
+        const widthDelta = east ? dx : -dx;
+        const heightDelta = south ? dy : -dy;
+        let width = Math.abs(heightDelta) > Math.abs(widthDelta)
+          ? (rect.h + heightDelta) * ratio
+          : rect.w + widthDelta;
+        let height = width / ratio;
+        const maxW = east ? containerWidth - anchorX : anchorX;
+        const maxH = south ? containerHeight - anchorY : anchorY;
+        const fit = Math.min(
+          1,
+          maxW / Math.max(width, 1),
+          maxH / Math.max(height, 1)
+        );
+        width = Math.max(24, width * fit);
+        height = width / ratio;
+        placeCropBox(
+          east ? anchorX : anchorX - width,
+          south ? anchorY : anchorY - height,
+          width,
+          height
         );
       } else {
         let nx = rect.x, ny = rect.y, nw = rect.w, nh = rect.h;
@@ -1506,6 +1755,11 @@ function bindCrop() {
 }
 
 function setupCrop() {
+  $("#crop-ratio").addEventListener("change", (e) => {
+    const raw = e.target.value;
+    _crop.ratio = raw === "free" ? null : Number(raw);
+    if (_crop.ratio) resetCropToRatio(_crop.ratio);
+  });
   $("#crop-cancel").addEventListener("click", () => {
     $("#modal-crop").hidden = true;
   });
@@ -1522,6 +1776,32 @@ function setupCrop() {
     const h = parseFloat(box.style.height) / containerHeight;
     const round = (v) => Math.round(v * 1000) / 1000;
     recordHistory(false);
+    if (_crop.mode === "logo") {
+      state.data.school_logo_crop = { x: round(x), y: round(y), w: round(w), h: round(h) };
+      const sx = x * img.naturalWidth;
+      const sy = y * img.naturalHeight;
+      const sw = w * img.naturalWidth;
+      const sh = h * img.naturalHeight;
+      const maxPixels = 1200;
+      const longest = Math.max(sw, sh);
+      const scale = longest > maxPixels ? maxPixels / longest : 1;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(sw * scale);
+      canvas.height = Math.round(sh * scale);
+      canvas.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/png");
+      const saved = await api.save_image(dataUrl, "logo");
+      if (saved.ok) {
+        state.data.school_logo = saved.path;
+        $("#modal-crop").hidden = true;
+        renderForm();
+        markDirty(true);
+        toast(t("toast_logo_crop_applied"));
+      } else {
+        toast((saved.errores && saved.errores[0]) || t("toast_crop_save_error"));
+      }
+      return;
+    }
     state.data.photo_crop = { x: round(x), y: round(y), w: round(w), h: round(h) };
     const sx = x * img.naturalWidth;
     const sy = y * img.naturalHeight;
@@ -1882,18 +2162,94 @@ function renderSocials() {
 
 function personalLogoField(key, label) {
   const fieldDiv = document.createElement("div");
-  fieldDiv.className = "field";
+  fieldDiv.className = "field wide";
   const lb = document.createElement("label");
   lb.textContent = label;
   const row = document.createElement("div");
   row.className = "logo-row";
+  const preview = document.createElement("img");
+  preview.className = "logo-preview";
+  preview.alt = "";
+  preview.onerror = () => { preview.hidden = true; };
   const status = document.createElement("span");
   status.className = "logo-status";
   const paint = () => {
     const name = state.data[key] ? state.data[key].split(/[\\/]/).pop() : "";
-    status.textContent = name ? "✓ " + name : t("no_logo");
-    status.style.color = name ? "var(--ok)" : "";
+    const hasLogo = !!name;
+    status.textContent = hasLogo ? name : t("no_logo");
+    status.style.color = hasLogo ? "var(--ok)" : "";
+    preview.hidden = !hasLogo;
+    if (hasLogo) {
+      preview.src = "/media/" + encodeURIComponent(name);
+    } else {
+      preview.removeAttribute("src");
+    }
+    adjust.hidden = !hasLogo;
+    remove.hidden = !hasLogo;
+    options.hidden = !hasLogo;
+    size.hidden = !hasLogo;
   };
+  const options = document.createElement("div");
+  options.className = "logo-options";
+  const sideLabel = document.createElement("label");
+  sideLabel.textContent = t("logo_side_label");
+  const side = document.createElement("select");
+  side.className = "logo-side";
+  [
+    ["left", t("logo_side_left")],
+    ["right", t("logo_side_right")],
+  ].forEach(([value, text]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = text;
+    side.appendChild(option);
+  });
+  side.value = state.data.school_logo_side === "right" ? "right" : "left";
+  side.addEventListener("change", () => {
+    state.data.school_logo_side = side.value === "right" ? "right" : "left";
+    markDirty(true);
+  });
+  sideLabel.appendChild(side);
+  options.appendChild(sideLabel);
+
+  const size = document.createElement("div");
+  size.className = "photo-size logo-size";
+  const widthGroup = document.createElement("label");
+  widthGroup.className = "size-field";
+  const widthLabel = document.createElement("span");
+  widthLabel.textContent = t("width_label") + " (cm)";
+  const widthInput = document.createElement("input");
+  widthInput.type = "number";
+  widthInput.min = "0.5";
+  widthInput.max = "6";
+  widthInput.step = "0.1";
+  widthGroup.append(widthLabel, widthInput);
+  const heightGroup = document.createElement("label");
+  heightGroup.className = "size-field";
+  const heightLabel = document.createElement("span");
+  heightLabel.textContent = t("height_label") + " (cm)";
+  const heightInput = document.createElement("input");
+  heightInput.type = "number";
+  heightInput.min = "0.3";
+  heightInput.max = "4";
+  heightInput.step = "0.1";
+  heightGroup.append(heightLabel, heightInput);
+  size.append(widthGroup, heightGroup);
+  const fillSize = () => {
+    widthInput.value = Number(state.data.school_logo_width_cm) || 4;
+    heightInput.value = Number(state.data.school_logo_height_cm) || 1.5;
+  };
+  widthInput.addEventListener("change", () => {
+    recordHistory(false);
+    state.data.school_logo_width_cm = Number(widthInput.value) || 4;
+    markDirty(true);
+  });
+  heightInput.addEventListener("change", () => {
+    recordHistory(false);
+    state.data.school_logo_height_cm = Number(heightInput.value) || 1.5;
+    markDirty(true);
+  });
+  fillSize();
   const button = document.createElement("button");
   button.className = "small";
   button.textContent = t("choose_logo");
@@ -1906,7 +2262,7 @@ function personalLogoField(key, label) {
     recordHistory(false);
     let path = r.path;
     try {
-      const dataUrl = await normalizeImage(r.url, 512, "image/png");
+      const dataUrl = await normalizeImage(r.url, 1024, "image/png");
       const saved = await api.save_image(dataUrl, "logo");
       if (saved.ok && saved.path) path = saved.path;
       else toast((saved.errores && saved.errores[0]) || t("toast_logo_normalize_error"));
@@ -1914,9 +2270,17 @@ function personalLogoField(key, label) {
       toast(t("toast_logo_normalize_error"));
     }
     state.data[key] = path;
+    state.data.school_logo_original = path;
+    state.data.school_logo_crop = null;
     paint();
     markDirty(true);
+    openCrop("logo");
   };
+  const adjust = document.createElement("button");
+  adjust.className = "small";
+  adjust.textContent = t("adjust_area");
+  adjust.hidden = true;
+  adjust.onclick = () => openCrop("logo");
   const remove = document.createElement("button");
   remove.className = "remove-button";
   remove.textContent = "✕";
@@ -1924,46 +2288,19 @@ function personalLogoField(key, label) {
   remove.onclick = () => {
     recordHistory(false);
     state.data[key] = "";
+    state.data.school_logo_original = "";
+    state.data.school_logo_crop = null;
     paint();
     markDirty(true);
   };
   paint();
-  row.append(button, remove, status);
+  row.append(preview, button, adjust, remove, status);
 
-  const size = document.createElement("div");
-  size.className = "photo-size";
-  const widthLabel = document.createElement("label");
-  widthLabel.textContent = t("width_cm");
-  const widthInput = document.createElement("input");
-  widthInput.type = "number";
-  widthInput.min = "0.5";
-  widthInput.max = "6";
-  widthInput.step = "0.1";
-  const heightLabel = document.createElement("label");
-  heightLabel.textContent = t("height_cm");
-  const heightInput = document.createElement("input");
-  heightInput.type = "number";
-  heightInput.min = "0.3";
-  heightInput.max = "4";
-  heightInput.step = "0.1";
-  const fillSize = () => {
-    widthInput.value = Number(state.data.school_logo_width_cm) || 2.4;
-    heightInput.value = Number(state.data.school_logo_height_cm) || 0.85;
-  };
-  widthInput.addEventListener("change", () => {
-    recordHistory(false);
-    state.data.school_logo_width_cm = Number(widthInput.value) || 2.4;
-    markDirty(true);
-  });
-  heightInput.addEventListener("change", () => {
-    recordHistory(false);
-    state.data.school_logo_height_cm = Number(heightInput.value) || 0.85;
-    markDirty(true);
-  });
-  size.append(widthLabel, widthInput, heightLabel, heightInput);
-  fillSize();
+  const hint = document.createElement("p");
+  hint.className = "form-hint";
+  hint.textContent = t("school_logo_hint");
 
-  fieldDiv.append(lb, row, size);
+  fieldDiv.append(lb, row, options, size, hint);
   return fieldDiv;
 }
 
@@ -2019,20 +2356,49 @@ function renderForm() {
   cont.appendChild(personal);
   paintPhoto(); // now #photo-preview is in the DOM
 
-  const socials = sectionCard(t("socials_title"));
-  socials.content.appendChild(renderSocials());
-  cont.appendChild(socials);
-
-  const extra = sectionCard(t("section_extra"));
-  extra.title = t("extra_fields_tip");
-  extra.content.appendChild(renderDynamicList("extra_fields"));
-  cont.appendChild(extra);
+  // Optional cards only appear when they have content. The Add menu creates
+  // the first empty row, so a new CV stays clean and a saved CV that uses them
+  // opens with the cards visible.
+  const socialEntries = socialsList();
+  const extraEntries = Array.isArray(state.data.extra_fields)
+    ? state.data.extra_fields
+    : [];
+  if (socialEntries.length) {
+    const socials = sectionCard(t("socials_title"));
+    socials.id = "card-socials";
+    socials.content.appendChild(renderSocials());
+    cont.appendChild(socials);
+  }
+  if (extraEntries.length) {
+    const extra = sectionCard(t("section_extra"));
+    extra.id = "card-extra";
+    extra.title = t("extra_fields_tip");
+    extra.content.appendChild(renderDynamicList("extra_fields"));
+    cont.appendChild(extra);
+  }
+  const showSections = state.showSections || {};
+  const visibleSections = sectionOrder().filter(
+    (key) => sectionHasContent(key) || showSections[key]
+  );
+  if (!socialEntries.length && !extraEntries.length && !visibleSections.length) {
+    const hint = document.createElement("p");
+    hint.className = "form-hint";
+    hint.append(document.createTextNode(t("form_optional_hint") + " "));
+    const sample = document.createElement("button");
+    sample.type = "button";
+    sample.className = "small";
+    sample.dataset.accion = "load-sample";
+    sample.textContent = t("action_load_sample");
+    hint.appendChild(sample);
+    cont.appendChild(hint);
+  }
 
   // Standard sections in the order chosen by the user; each header allows
-  // renaming, hiding and reordering. "Personal details", "Social networks" and
-  // "Extra details" stay fixed at the top and the "Blocks" card at the end.
-  sectionOrder().forEach((key) => {
+  // renaming, hiding and reordering. Empty sections stay hidden until the
+  // user adds them from Add or a loaded document has content in them.
+  visibleSections.forEach((key) => {
     const card = sectionCard(sectionName(key), key, true);
+    card.dataset.sectionCard = key;
     if (isSectionHidden(key)) {
       card.classList.add("section-hidden");
       card.content.hidden = true;
@@ -2045,13 +2411,55 @@ function renderForm() {
     cont.appendChild(card);
   });
 
-  const blocksCard = sectionCard(t("section_blocks"));
-  blocksCard.title = t("blocks_tip");
-  const blockList = document.createElement("div");
-  blockList.id = "blocks-inline";
-  blocksCard.content.appendChild(blockList);
-  cont.appendChild(blocksCard);
-  paintBlocksList(blockList);
+  if (currentBlocks().length) {
+    const blocksCard = sectionCard(t("section_blocks"));
+    blocksCard.title = t("blocks_tip");
+    const blockList = document.createElement("div");
+    blockList.id = "blocks-inline";
+    blocksCard.content.appendChild(blockList);
+    cont.appendChild(blocksCard);
+    paintBlocksList(blockList);
+  }
+}
+
+function addSection(key) {
+  if (!state.data || DEFAULT_SECTION_ORDER.indexOf(key) < 0) return;
+  state.showSections = state.showSections || {};
+  state.showSections[key] = true;
+  // Give list sections one empty row so the fields appear immediately; empty
+  // entries are ignored by the exporters until the user fills them.
+  if (key !== "summary" && !sectionHasContent(key)) {
+    if (!Array.isArray(state.data[key])) state.data[key] = [];
+    state.data[key].push({});
+    markDirty(true);
+  }
+  renderForm();
+  const card = document.querySelector('[data-section-card="' + key + '"]');
+  if (card) {
+    card.scrollIntoView({ block: "nearest" });
+    const first = card.querySelector("input, textarea, select, .add-entry-button");
+    if (first) first.focus();
+  }
+}
+
+function addOptionalSection(kind) {
+  if (!state.data) return;
+  recordHistory(true);
+  if (kind === "socials") {
+    if (!Array.isArray(state.data.socials)) state.data.socials = [];
+    state.data.socials.push({ network: "github", label: "", value: "" });
+  } else {
+    if (!Array.isArray(state.data.extra_fields)) state.data.extra_fields = [];
+    state.data.extra_fields.push({ label: "", value: "" });
+  }
+  markDirty(true);
+  renderForm();
+  const card = kind === "socials" ? $("#card-socials") : $("#card-extra");
+  if (card) {
+    card.scrollIntoView({ block: "nearest" });
+    const first = card.querySelector("input, textarea, select, .add-entry-button");
+    if (first) first.focus();
+  }
 }
 
 /* ---------------- free blocks (Add menu) ---------------- */
@@ -2138,9 +2546,20 @@ function mutateBlocks(fn, structural) {
 
 function createSeparatorBlock(style) {
   if (["line", "band", "space"].indexOf(style) < 0) style = "line";
+  let created = null;
   mutateBlocks((blocks) => {
-    blocks.push({ id: newBlockId(), type: "separator", style, position: "end" });
+    created = { id: newBlockId(), type: "separator", style, position: "end" };
+    blocks.push(created);
+    return created;
   });
+  renderForm();
+  scrollToBlock(created);
+}
+
+function scrollToBlock(block) {
+  if (!block || !block.id) return;
+  const row = document.querySelector('[data-block-id="' + block.id + '"]');
+  if (row) row.scrollIntoView({ block: "nearest" });
 }
 
 function moveBlock(block, step) {
@@ -2158,6 +2577,8 @@ function deleteBlock(block) {
     const i = blocks.indexOf(block);
     if (i >= 0) blocks.splice(i, 1);
   });
+  // Hide the "Custom content" card when the last block is removed.
+  if (!currentBlocks().length) renderForm();
 }
 
 function refreshBlockLists() {
@@ -2185,6 +2606,7 @@ function blockRow(block) {
   const div = document.createElement("div");
   div.className = "entry";
   const blockKey = block && block.id ? String(block.id) : "";
+  if (blockKey) div.dataset.blockId = blockKey;
   applyCollapse("blocks", blockKey, div);
   const header = document.createElement("div");
   header.className = "entry-header";
@@ -2254,8 +2676,21 @@ function blockRow(block) {
   header.append(label, actions);
   header.addEventListener("click", (e) => {
     if (e.target.closest("button")) return;
+    // A block has no useful collapsed content: clicking its row opens the
+    // editor directly, so the user does not have to find the Edit button.
+    if (block && block.type === "list") {
+      openListBlockModal(block.mode, block);
+      return;
+    }
+    if (block && block.type === "section") {
+      openCustomSectionModal(block);
+      return;
+    }
     toggleCollapse("blocks", blockKey, div);
   });
+  if (block && (block.type === "list" || block.type === "section")) {
+    header.title = t("edit");
+  }
   div.appendChild(header);
   return div;
 }
@@ -2277,15 +2712,21 @@ function acceptCustomSection() {
   }
   const editing = _editingBlock;
   _editingBlock = null;
+  let saved = null;
   mutateBlocks((blocks) => {
     if (editing && blocks.indexOf(editing) >= 0) {
       editing.title = title;
       editing.content = content;
+      saved = editing;
     } else {
-      blocks.push({ id: newBlockId(), type: "section", title, content, position: "end" });
+      saved = { id: newBlockId(), type: "section", title, content, position: "end" };
+      blocks.push(saved);
     }
+    return saved;
   });
   closeModal($("#modal-custom-section"));
+  renderForm();
+  scrollToBlock(saved);
 }
 
 /* Generic list templates ("list" block type): title+detail pairs in 1-3
@@ -2425,20 +2866,26 @@ function acceptListBlock() {
   }
   const editing = _listEditing;
   _listEditing = null;
+  let saved = null;
   mutateBlocks((blocks) => {
     if (editing && blocks.indexOf(editing) >= 0) {
       editing.mode = mode;
       editing.title = title;
       editing.columns = columns;
       editing.entries = entries;
+      saved = editing;
     } else {
-      blocks.push({
+      saved = {
         id: newBlockId(), type: "list", mode, title, columns, entries,
         position: "end",
-      });
+      };
+      blocks.push(saved);
     }
+    return saved;
   });
   closeModal($("#modal-list-block"));
+  renderForm();
+  scrollToBlock(saved);
 }
 
 function openBlocksModal() {
@@ -2523,7 +2970,22 @@ function openWizard() {
   $("#install-cancel").hidden = true;
   $("#install-cancel").disabled = false;
   $("#wz-install").disabled = false;
+  $("#wz-from-file").disabled = false;
   $("#modal-wizard").hidden = false;
+}
+
+function setInstallRunning(running) {
+  $("#wz-install").disabled = running;
+  $("#wz-from-file").disabled = running;
+  $("#install-cancel").hidden = !running;
+  $("#install-cancel").disabled = false;
+  if (running) {
+    $("#wz-progress").hidden = false;
+    $("#wz-status").textContent = "";
+    $("#wz-bar").style.width = "0%";
+  } else {
+    $("#wz-progress").hidden = true;
+  }
 }
 
 function closeWizard(ok) {
@@ -2535,19 +2997,24 @@ function closeWizard(ok) {
 
 function setupWizard() {
   $("#wz-install").addEventListener("click", async () => {
-    const button = $("#wz-install");
-    button.disabled = true;
-    $("#install-cancel").hidden = false;
-    $("#install-cancel").disabled = false;
-    $("#wz-progress").hidden = false;
-    $("#wz-status").textContent = "";
-    $("#wz-bar").style.width = "0%";
+    setInstallRunning(true);
     try {
       await api.install_latex();
     } catch (e) {
-      button.disabled = false;
-      $("#install-cancel").hidden = true;
+      setInstallRunning(false);
       $("#wz-status").textContent = t("wizard_install_start_error");
+      console.error(e);
+    }
+  });
+
+  $("#wz-from-file").addEventListener("click", async () => {
+    setInstallRunning(true);
+    try {
+      const r = await api.install_latex_from_file();
+      if (r && r.cancelado) setInstallRunning(false);
+    } catch (e) {
+      setInstallRunning(false);
+      $("#wz-status").textContent = t("wizard_from_file_error");
       console.error(e);
     }
   });
@@ -2603,6 +3070,7 @@ window.__onInstallProgress = function (p) {
 
 window.__onInstallDone = function (r) {
   $("#wz-install").disabled = false;
+  $("#wz-from-file").disabled = false;
   $("#install-cancel").hidden = true;
   $("#install-cancel").disabled = false;
   $("#wz-bar").style.width = "100%";
@@ -2708,13 +3176,17 @@ async function openPrefs() {
   $("#pf-message").textContent = "";
   $("#pf-paper").value = state.prefs.paper;
   $("#pf-font-size").value = String(state.prefs.font_size);
+  $("#pf-font-style").value = state.prefs.font_style || "";
+  $("#pf-units").value = state.prefs.units === "in" ? "in" : "cm";
   $("#pf-auto-compile").checked = !!state.prefs.auto_compile;
   $("#pf-breakpoint").value = state.prefs.breakpoint;
+  $("#pf-layout-mode").value = state.prefs.layout_mode || "side";
   $("#pf-margin-top").value = state.prefs.margins.top;
   $("#pf-margin-bottom").value = state.prefs.margins.bottom;
   $("#pf-margin-left").value = state.prefs.margins.left;
   $("#pf-margin-right").value = state.prefs.margins.right;
   $("#ui-language").value = getLang();
+  $("#pf-engine-mirror").value = state.prefs.tinytex_url || "";
   const colors = state.prefs.colors || {};
   COLOR_FIELDS.forEach((field) => {
     const value = parseHex(colors[field]);
@@ -2733,6 +3205,15 @@ async function checkEnginePrefs() {
     : t("engine_missing");
   $("#engine-warning").hidden = r.ok;
   state.latexOk = r.ok;
+  const details = $("#pf-engine-diagnostics");
+  const text = $("#pf-engine-diagnostics-text");
+  if (!r.ok && r.diagnostics) {
+    text.textContent = JSON.stringify(r.diagnostics, null, 2);
+    details.hidden = false;
+  } else {
+    text.textContent = "";
+    details.hidden = true;
+  }
 }
 
 async function onLanguageChange(event) {
@@ -2758,6 +3239,7 @@ async function onLanguageChange(event) {
   refreshBlockLists();
   renderPreviewStatus();
   renderStatus();
+  updateLayoutToggle();
   scheduleCompile();
 }
 
@@ -2772,6 +3254,16 @@ function setupPrefs() {
     api.set_prefs("font_size", Number(e.target.value));
     markDirty(true);
   });
+  $("#pf-font-style").addEventListener("change", (e) => {
+    state.prefs.font_style = e.target.value;
+    api.set_prefs("font_style", e.target.value);
+    markDirty(true);
+  });
+  $("#pf-units").addEventListener("change", (e) => {
+    state.prefs.units = e.target.value === "in" ? "in" : "cm";
+    api.set_prefs("units", state.prefs.units);
+    renderForm();
+  });
   $("#pf-auto-compile").addEventListener("change", (e) => {
     state.prefs.auto_compile = e.target.checked;
     api.set_prefs("auto_compile", e.target.checked);
@@ -2781,6 +3273,17 @@ function setupPrefs() {
   $("#pf-breakpoint").addEventListener("change", (e) => {
     state.prefs.breakpoint = Number(e.target.value);
     api.set_prefs("breakpoint", Number(e.target.value));
+    applyResponsive();
+  });
+  $("#pf-layout-mode").addEventListener("change", (e) => {
+    state.prefs.layout_mode = e.target.value;
+    api.set_prefs("layout_mode", e.target.value);
+    applyResponsive();
+  });
+  $("#layout-toggle").addEventListener("click", () => {
+    const next = isStacked() ? "side" : "stacked";
+    state.prefs.layout_mode = next;
+    api.set_prefs("layout_mode", next);
     applyResponsive();
   });
   ["top", "bottom", "left", "right"].forEach((side) => {
@@ -2797,6 +3300,11 @@ function setupPrefs() {
     });
   });
   $("#pf-engine-check").addEventListener("click", checkEnginePrefs);
+  $("#pf-engine-mirror").addEventListener("change", (e) => {
+    const value = e.target.value.trim();
+    state.prefs.tinytex_url = value;
+    api.set_prefs("tinytex_url", value);
+  });
   $("#pf-engine-path").addEventListener("click", async () => {
     const r = await api.choose_latex_path();
     if (r.ok) {
@@ -2944,81 +3452,196 @@ function setupShortcuts() {
 
 /* ---------------- center splitter ---------------- */
 
-// Minimum width of the form and the preview while dragging the splitter. The
-// chosen position is stored in prefs ("split", in %); it is UI only and never
-// affects the .tex nor the PDF. Double-click resets to 50 %.
+// Minimum size of the form and the preview while dragging the splitter. The
+// chosen positions are stored in prefs ("split" for side-by-side,
+// "split_vertical" for stacked); they are UI only and never affect the .tex
+// nor the PDF. Double-click resets the current orientation to 50 %.
 const SPLITTER_MIN_FORM = 300;
 const SPLITTER_MIN_PREVIEW = 320;
+
+function isStacked() {
+  return document.body.classList.contains("stacked");
+}
 
 function applySplit(pct) {
   const container = $("#content");
   if (!container) return;
   const value = Number(pct);
-  if (!(value > 0) || document.body.classList.contains("stacked")) {
+  if (!(value > 0) || isStacked()) {
     container.style.removeProperty("--form-width");
     return;
   }
   container.style.setProperty("--form-width", value + "%");
 }
 
+function applyVerticalSplit(pct) {
+  const container = $("#content");
+  if (!container) return;
+  const value = Number(pct);
+  if (!(value > 0) || !isStacked()) {
+    container.style.removeProperty("--preview-height");
+    return;
+  }
+  container.style.setProperty("--preview-height", value + "%");
+}
+
 function setupSplitter() {
   const splitter = $("#splitter");
   const container = $("#content");
   const form = $("#form-area");
-  if (!splitter || !container || !form) return;
+  const preview = $("#preview-area");
+  if (!splitter || !container || !form || !preview) return;
   let dragging = false;
   let startX = 0;
+  let startY = 0;
   let startWidth = 0;
+  let startHeight = 0;
 
-  const clamp = (px) => {
+  const clampWidth = (px) => {
     const total = container.getBoundingClientRect().width || 1;
     const min = Math.min(SPLITTER_MIN_FORM, total * 0.35);
     const max = Math.max(min, total - SPLITTER_MIN_PREVIEW);
     return Math.min(Math.max(px, min), max);
   };
 
+  const clampHeight = (px) => {
+    const total = container.getBoundingClientRect().height || 1;
+    const minPreview = Math.min(SPLITTER_MIN_PREVIEW, total * 0.35);
+    const minForm = Math.min(SPLITTER_MIN_FORM, total * 0.35);
+    const max = Math.max(minPreview, total - minForm);
+    return Math.min(Math.max(px, minPreview), max);
+  };
+
   splitter.addEventListener("pointerdown", (e) => {
-    if (document.body.classList.contains("stacked")) return;
+    if (e.button !== 0) return;
     dragging = true;
     startX = e.clientX;
+    startY = e.clientY;
     startWidth = form.getBoundingClientRect().width;
+    startHeight = preview.getBoundingClientRect().height;
     document.body.classList.add("resizing");
+    if (isStacked()) document.body.classList.add("resizing-vertical");
+    // Capture the pointer so a release outside the window still reaches us.
+    // Without it, `body.resizing` (z-index 80) can stay on top of every modal.
+    try {
+      splitter.setPointerCapture(e.pointerId);
+    } catch (err) { /* older engines: document listeners still work */ }
     e.preventDefault();
   });
 
   document.addEventListener("pointermove", (e) => {
     if (!dragging) return;
-    const width = clamp(startWidth + (e.clientX - startX));
-    container.style.setProperty("--form-width", width + "px");
+    if (isStacked()) {
+      const height = clampHeight(startHeight + (e.clientY - startY));
+      container.style.setProperty("--preview-height", height + "px");
+    } else {
+      const width = clampWidth(startWidth + (e.clientX - startX));
+      container.style.setProperty("--form-width", width + "px");
+    }
   });
 
-  const release = () => {
+  const release = (e) => {
     if (!dragging) return;
     dragging = false;
-    document.body.classList.remove("resizing");
-    const total = container.getBoundingClientRect().width;
-    if (total > 0) {
-      const pct = Math.round((form.getBoundingClientRect().width / total) * 1000) / 10;
-      state.prefs.split = pct;
-      api.set_prefs("split", pct);
+    document.body.classList.remove("resizing", "resizing-vertical");
+    if (e && e.pointerId != null) {
+      try {
+        splitter.releasePointerCapture(e.pointerId);
+      } catch (err) { /* already released */ }
+    }
+    if (isStacked()) {
+      const total = container.getBoundingClientRect().height;
+      if (total > 0) {
+        const pct = Math.round((preview.getBoundingClientRect().height / total) * 1000) / 10;
+        state.prefs.split_vertical = pct;
+        api.set_prefs("split_vertical", pct);
+      }
+    } else {
+      const total = container.getBoundingClientRect().width;
+      if (total > 0) {
+        const pct = Math.round((form.getBoundingClientRect().width / total) * 1000) / 10;
+        state.prefs.split = pct;
+        api.set_prefs("split", pct);
+      }
     }
   };
+  _splitterRelease = release;
+  splitter.addEventListener("pointerup", release);
+  splitter.addEventListener("pointercancel", release);
+  splitter.addEventListener("lostpointercapture", release);
   document.addEventListener("pointerup", release);
   document.addEventListener("pointercancel", release);
+  // A window blur/alt-tab can swallow the pointerup; never leave the veil on.
+  window.addEventListener("blur", () => release());
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) release();
+  });
 
   splitter.addEventListener("dblclick", () => {
-    if (state.prefs) state.prefs.split = 50;
-    api.set_prefs("split", 50);
-    applySplit(50);
+    if (isStacked()) {
+      if (state.prefs) state.prefs.split_vertical = 50;
+      api.set_prefs("split_vertical", 50);
+      applyVerticalSplit(50);
+    } else {
+      if (state.prefs) state.prefs.split = 50;
+      api.set_prefs("split", 50);
+      applySplit(50);
+    }
   });
 }
 
 /* ---------------- responsive ---------------- */
 
+let _responsiveFrame = null;
+
+function scheduleResponsive() {
+  if (_responsiveFrame !== null) return;
+  _responsiveFrame = window.requestAnimationFrame(() => {
+    _responsiveFrame = null;
+    applyResponsive();
+  });
+}
+
+function updateLayoutToggle() {
+  const button = $("#layout-toggle");
+  if (!button) return;
+  button.textContent = isStacked()
+    ? t("layout_switch_to_side")
+    : t("layout_switch_to_stacked");
+}
+
 function applyResponsive() {
   const breakpoint = Number(state.prefs && state.prefs.breakpoint) || 960;
-  document.body.classList.toggle("stacked", window.innerWidth < breakpoint);
+  // Measure the real content box: some webviews/WMs resize the outer window
+  // without firing the JS resize event.
+  const content = $("#content");
+  const rect = content ? content.getBoundingClientRect() : null;
+  const width = rect && rect.width > 0 ? rect.width : window.innerWidth;
+  const height = rect && rect.height > 0 ? rect.height : window.innerHeight;
+  const mode = (state.prefs && state.prefs.layout_mode) || "side";
+  // The default is the explicit button choice. "auto" remains an advanced
+  // option: stack on narrow/portrait/half-screen windows.
+  let stacked = false;
+  if (mode === "auto") {
+    stacked = width <= breakpoint || width <= height ||
+      window.innerWidth <= window.innerHeight * 1.25;
+  } else {
+    stacked = mode === "stacked";
+  }
+  document.body.classList.toggle("stacked", stacked);
+  const formPanel = $("#form-panel");
+  const formWidth = formPanel ? formPanel.clientWidth : 0;
+  document.body.classList.toggle(
+    "form-narrow",
+    formWidth > 0 && formWidth < 620
+  );
+  const splitter = $("#splitter");
+  if (splitter) {
+    splitter.setAttribute("aria-orientation", stacked ? "horizontal" : "vertical");
+  }
   applySplit(state.prefs && state.prefs.split);
+  applyVerticalSplit(state.prefs && state.prefs.split_vertical);
+  updateLayoutToggle();
 }
 
 /* ---------------- first-run language ---------------- */
@@ -3107,8 +3730,13 @@ async function startApp() {
     renderForm();
     updateMarks();
     updateHistoryButtons();
-    applyResponsive();
-    window.addEventListener("resize", applyResponsive);
+    scheduleResponsive();
+    window.addEventListener("resize", scheduleResponsive);
+    const content = $("#content");
+    if (content && window.ResizeObserver) {
+      // Tiling WMs may change the window without a reliable window.resize.
+      new ResizeObserver(scheduleResponsive).observe(content);
+    }
     $("#engine-warning").hidden = info.latex_ok;
     renderPreviewStatus();
     setupPreviewFallback(info.platform);

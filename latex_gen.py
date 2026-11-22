@@ -7,6 +7,8 @@ import tex_datos
 BASE_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 
 TEMPLATES = ("classic", "harvard", "modern", "creative", "chinese", "sidebar", "sidebar-right", "tabbed", "ribbon", "navy", "playful", "sword")
+# Harvard's centred academic header is intentionally photo-free.
+TEMPLATES_WITHOUT_PHOTO = {"harvard"}
 TEMPLATE_FILES = {
     "classic": "classic/plantilla.tex",
     "harvard": "harvard/harvard.tex",
@@ -41,6 +43,15 @@ _LATEX_ESCAPES = {
 LOGO_EXTS = {".jpg", ".jpeg", ".png"}
 # Width fractions for 1-3 column layouts.
 COLUMN_WIDTHS = {1: "1.0", 2: "0.48", 3: "0.31"}
+# Typography preferences. "" means "keep the template's own font". The style
+# maps to the default LaTeX family command; the sizes are the ones the UI
+# offers (article itself only accepts 10/11/12pt, see _font_size_choice).
+FONT_STYLES = ("serif", "sans", "mono")
+_FONT_STYLE_FAMILY = {
+    "serif": "\\rmdefault",
+    "sans": "\\sfdefault",
+    "mono": "\\ttdefault",
+}
 
 # Default order of the standard CV body sections.
 DEFAULT_SECTION_ORDER = (
@@ -257,7 +268,9 @@ def empty_data():
         "photo": "", "photo_original": "", "photo_crop": None,
         "photo_width_cm": 4.0, "photo_height_cm": 5.0,
         "school_name": "", "school_logo": "",
-        "school_logo_width_cm": 2.4, "school_logo_height_cm": 0.85,
+        "school_logo_original": "", "school_logo_crop": None,
+        "school_logo_side": "left",
+        "school_logo_width_cm": 4.0, "school_logo_height_cm": 1.5,
         "summary": "",
         "work": [],
         "internships": [],
@@ -418,6 +431,48 @@ def _social_line(line, on_dark=False):
     return f"{{\\footnotesize\\color{{{color}}} {line}}}"
 
 
+def _logo_side(d):
+    """'left' or 'right' corner for the school logo."""
+    return "right" if str(d.get("school_logo_side", "")).strip().lower() == "right" else "left"
+
+
+def _clamp_cm(value, default, low, high):
+    try:
+        number = float(value or default)
+    except (TypeError, ValueError):
+        number = default
+    return min(max(number, low), high)
+
+
+def _school_logo_block(d, width_cm=None, height_cm=None, center=False, side="left",
+                       max_width=6.0, max_height=3.0):
+    """Letterhead logo for the chosen top corner, or "".
+
+    The frontend lets the user set the logo size in cm. The width/height are
+    clamped to the available area so a large value cannot break the layout:
+    the left letterhead can use up to 6 cm, the sidebar up to 4.2 cm.
+    """
+    logo = d.get("school_logo")
+    if not logo or not os.path.isfile(logo):
+        return ""
+    ext = os.path.splitext(logo)[1].lower()
+    if ext not in LOGO_EXTS:
+        return ""
+    if width_cm is None:
+        width_cm = _clamp_cm(d.get("school_logo_width_cm"), 4.0, 0.5, max_width)
+    if height_cm is None:
+        height_cm = _clamp_cm(d.get("school_logo_height_cm"), 1.5, 0.3, max_height)
+    box = (
+        f"\\includegraphics[width={width_cm:g}cm,height={height_cm:g}cm,"
+        f"keepaspectratio]{{logo_egresado{ext}}}"
+    )
+    if center:
+        return "{\\centering " + box + "\\par}\n\\vspace{0.5em}\n"
+    if side == "right":
+        return "{\\raggedleft " + box + "\\par}\n\\vspace{0.5em}\n"
+    return "\\noindent " + box + "\\par\n\\vspace{0.5em}\n"
+
+
 def _contact_groups(d, L, on_dark=False):
     """Contact lines grouped by priority: personal data, objective, links.
 
@@ -482,15 +537,23 @@ def _contacts(d, L, on_dark=False):
     return "{\\small\n" + " \\\\\n".join(lines) + "\n\\par}"
 
 
-def _image_info(d):
-    logo_ref = None
-    logo = d.get("school_logo")
-    if logo and os.path.isfile(logo):
-        ext = os.path.splitext(logo)[1].lower()
-        if ext in LOGO_EXTS:
-            logo_ref = f"logo_egresado{ext}"
+def _image_info(d, include_logo=False, allow_photo=True):
+    """Photo/logo refs for the header.
 
-    photo = d.get("photo")
+    The school logo is included in the media column only when the caller asks
+    for it (right-corner mode); the left-corner logo is a separate letterhead
+    block. Harvard ignores the photo because its centred header looks better
+    without one.
+    """
+    logo_ref = None
+    if include_logo:
+        logo = d.get("school_logo")
+        if logo and os.path.isfile(logo):
+            ext = os.path.splitext(logo)[1].lower()
+            if ext in LOGO_EXTS:
+                logo_ref = f"logo_egresado{ext}"
+
+    photo = d.get("photo") if allow_photo else None
     photo_ext = os.path.splitext(photo)[1].lower() if photo else ""
     has_photo = bool(photo and os.path.exists(photo) and photo_ext in LOGO_EXTS)
     return logo_ref, has_photo, photo_ext
@@ -499,15 +562,11 @@ def _image_info(d):
 def _image_parts(d, logo_ref, has_photo, photo_ext):
     parts = []
     if logo_ref:
-        try:
-            lw = float(d.get("school_logo_width_cm") or 2.4)
-            lh = float(d.get("school_logo_height_cm") or 0.85)
-        except (TypeError, ValueError):
-            lw, lh = 2.4, 0.85
-        lw = min(max(lw, 0.5), 6.0)
-        lh = min(max(lh, 0.3), 4.0)
+        lw = _clamp_cm(d.get("school_logo_width_cm"), 4.0, 0.5, 4.0)
+        lh = _clamp_cm(d.get("school_logo_height_cm"), 1.5, 0.3, 2.0)
         parts.append(
-            f"\\noindent\\includegraphics[width={lw:g}cm,height={lh:g}cm,keepaspectratio]{{{logo_ref}}}\n"
+            f"\\includegraphics[width={lw:g}cm,height={lh:g}cm,keepaspectratio]"
+            f"{{{logo_ref}}}\\par\\vspace{{0.5em}}\n"
         )
     if has_photo:
         try:
@@ -517,8 +576,6 @@ def _image_parts(d, logo_ref, has_photo, photo_ext):
             width, height = 4.0, 5.0
         width = min(max(width, 1.0), 12.0)
         height = min(max(height, 1.0), 15.0)
-        if logo_ref:
-            parts.append("\\vspace{0.15em}\n")
         parts.append(
             "{\\setlength{\\fboxsep}{3pt}\n"
             f"\\fcolorbox{{gris}}{{white}}{{\\includegraphics[width={width:g}cm,height={height:g}cm,keepaspectratio]{{foto{photo_ext}}}}}\n"
@@ -535,9 +592,8 @@ def _header_classic(d, L, parts):
     right_col = ""
     if parts:
         right_col = (
-            "\\begin{minipage}[t]{0.28\\textwidth}\n"
+            "\\begin{minipage}[t]{0.28\\textwidth}\n\\vspace{0pt}\n"
             "\\raggedleft\n"
-            "\\vspace{0.25em}\n"
             + "".join(parts)
             + "\\end{minipage}\n"
         )
@@ -545,7 +601,7 @@ def _header_classic(d, L, parts):
     if right_col:
         row = (
             "\\noindent\n"
-            "\\begin{minipage}[t]{0.7\\textwidth}\n"
+            "\\begin{minipage}[t]{0.7\\textwidth}\n\\vspace{0pt}\n"
             f"  {name_tex}\\par\n"
             "  \\vspace{0.4em}\n"
             f"  {contact}\n"
@@ -589,15 +645,14 @@ def _header_modern(d, L, parts):
     if parts:
         row = (
             "\\noindent\n"
-            "\\begin{minipage}[t]{0.7\\textwidth}\n"
+            "\\begin{minipage}[t]{0.7\\textwidth}\n\\vspace{0pt}\n"
             f"  {name_tex}\\par\n"
             "  \\vspace{0.4em}\n"
             f"  {contact}\n"
             "\\end{minipage}%\n"
             "\\hfill\n"
-            "\\begin{minipage}[t]{0.28\\textwidth}\n"
+            "\\begin{minipage}[t]{0.28\\textwidth}\n\\vspace{0pt}\n"
             "\\raggedleft\n"
-            "\\vspace{0.25em}\n"
             + "".join(parts)
             + "\\end{minipage}\n"
         )
@@ -626,13 +681,12 @@ def _header_creative(d, L, parts):
         blocks = (
             "\\vspace{0.6em}\n"
             "\\noindent\n"
-            "\\begin{minipage}[t]{0.68\\textwidth}\n"
+            "\\begin{minipage}[t]{0.68\\textwidth}\n\\vspace{0pt}\n"
             f"{contact}\n"
             "\\end{minipage}%\n"
             "\\hfill\n"
-            "\\begin{minipage}[t]{0.28\\textwidth}\n"
+            "\\begin{minipage}[t]{0.28\\textwidth}\n\\vspace{0pt}\n"
             "\\raggedleft\n"
-            "\\vspace{0.3em}\n"
             + "".join(parts)
             + "\\end{minipage}\n"
         )
@@ -669,13 +723,12 @@ def _header_chinese(d, L, parts):
     if parts:
         row = (
             "\\noindent\n"
-            "\\begin{minipage}[t]{0.7\\textwidth}\n"
+            "\\begin{minipage}[t]{0.7\\textwidth}\n\\vspace{0pt}\n"
             + "".join(left_col)
             + "\\end{minipage}%\n"
             "\\hfill\n"
-            "\\begin{minipage}[t]{0.28\\textwidth}\n"
+            "\\begin{minipage}[t]{0.28\\textwidth}\n\\vspace{0pt}\n"
             "\\raggedleft\n"
-            "\\vspace{0.3em}\n"
             + "".join(parts)
             + "\\end{minipage}\n"
         )
@@ -711,6 +764,11 @@ def _contact_plain_width(line):
     the color name inside ``\\color{...}`` is not text either.
     """
     text = re.sub(r"\\allowbreak\s*", "", line)
+    # An inline school logo is a fixed small mark, not the length of its file
+    # name; drop the image and its box commands before measuring the text.
+    text = re.sub(r"\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}", "", text)
+    text = re.sub(r"\\raisebox\{[^}]*\}", "", text)
+    text = re.sub(r"\\hspace\*?\{[^}]*\}", "", text)
     text = re.sub(r"\\color\{[^}]*\}", "", text)
     text = re.sub(r"\\[A-Za-z]+\*?", "", text)
     text = text.replace("{", "").replace("}", "").strip()
@@ -793,14 +851,13 @@ def _header_tabbed(d, L, parts):
     if parts:
         row = (
             "\\noindent\n"
-            "\\begin{minipage}[t]{0.7\\textwidth}\n"
+            "\\begin{minipage}[t]{0.7\\textwidth}\n\\vspace{0pt}\n"
             "\\raggedright\n"
             + "".join(left)
             + "\\end{minipage}%\n"
             "\\hfill\n"
-            "\\begin{minipage}[t]{0.26\\textwidth}\n"
+            "\\begin{minipage}[t]{0.26\\textwidth}\n\\vspace{0pt}\n"
             "\\raggedleft\n"
-            "\\vspace{0.25em}\n"
             + "".join(parts)
             + "\\end{minipage}\n"
         )
@@ -888,14 +945,13 @@ def _header_navy(d, L, parts):
     if parts:
         row = (
             "\\noindent\n"
-            "\\begin{minipage}[t]{0.72\\textwidth}\n"
+            "\\begin{minipage}[t]{0.72\\textwidth}\n\\vspace{0pt}\n"
             "\\raggedright\n"
             + "".join(left)
             + "\\end{minipage}%\n"
             "\\hfill\n"
-            "\\begin{minipage}[t]{0.26\\textwidth}\n"
+            "\\begin{minipage}[t]{0.26\\textwidth}\n\\vspace{0pt}\n"
             "\\raggedleft\n"
-            "\\vspace{0.15em}\n"
             + "".join(parts)
             + "\\end{minipage}\n"
         )
@@ -926,14 +982,13 @@ def _header_playful(d, L, parts):
         # still uses the full column width.
         row = (
             "\\noindent\n"
-            "\\begin{minipage}[t]{0.72\\textwidth}\n"
+            "\\begin{minipage}[t]{0.72\\textwidth}\n\\vspace{0pt}\n"
             "\\raggedright\n"
             + "".join(left)
             + "\\end{minipage}%\n"
             "\\hfill\n"
-            "\\begin{minipage}[t]{0.26\\textwidth}\n"
+            "\\begin{minipage}[t]{0.26\\textwidth}\n\\vspace{0pt}\n"
             "\\raggedleft\n"
-            "\\vspace{0.25em}\n"
             + "".join(parts)
             + "\\end{minipage}\n"
         )
@@ -973,9 +1028,11 @@ def _header_sidebar(d, L, parts):
 
 
 def _sidebar(d, L):
-    """Bar content of the sidebar templates: photo, logo and contacts.
+    """Bar content of the sidebar templates: photo and contacts.
 
-    White text over the accent bar. The whole block is a zero-height overlay
+    White text over the accent bar. The school logo is inline with its contact
+    line (see ``_contact_groups``), so it does not add a separate image block.
+    The whole block is a zero-height overlay
     shifted into the bar (inner x=0.8cm, width 4.6cm): the "sidebar" variant
     shifts -6.2cm from the body's left edge (template's 7cm first-page left
     margin), the "sidebar-right" variant shifts textwidth+1.6cm, which lands at
@@ -991,7 +1048,7 @@ def _sidebar(d, L):
         if right
         else "\\hspace*{-6.2cm}"
     )
-    logo_ref, has_photo, photo_ext = _image_info(d)
+    _logo_ref, has_photo, photo_ext = _image_info(d)
     contact = _contacts(d, L, on_dark=True)
 
     def clamp(value, default, low, high):
@@ -1002,16 +1059,14 @@ def _sidebar(d, L):
         return min(max(number, low), high)
 
     images = []
-    if logo_ref:
-        lw = clamp(d.get("school_logo_width_cm"), 2.4, 0.5, 4.6)
-        images.append(
-            f"\\includegraphics[width={lw:g}cm,keepaspectratio]{{{logo_ref}}}\\par\n"
-        )
+    logo_block = _school_logo_block(
+        d, center=True, max_width=4.2, max_height=2.2
+    )
+    if logo_block:
+        images.append(logo_block)
     if has_photo:
         pw = clamp(d.get("photo_width_cm"), 4.0, 1.0, 4.6)
         ph = clamp(d.get("photo_height_cm"), 5.0, 1.0, 8.0)
-        if logo_ref:
-            images.append("\\vspace{0.4em}\n")
         images.append(
             "{\\setlength{\\fboxsep}{3pt}%\n"
             f"\\fcolorbox{{white}}{{white}}{{\\includegraphics"
@@ -1122,8 +1177,7 @@ def _header_sword(d, L, parts):
         row = (
             "".join(left)
             + "\\hfill\n"
-            + "\\begin{minipage}[t]{0.26\\textwidth}\n"
-            + "\\vspace{0pt}\n"
+            + "\\begin{minipage}[t]{0.26\\textwidth}\n\\vspace{0pt}\n"
             + "\\raggedleft\n"
             + "".join(stacked)
             + "\\end{minipage}\n"
@@ -1134,29 +1188,45 @@ def _header_sword(d, L, parts):
 
 
 def _header(d, L, template_name="classic"):
-    logo_ref, has_photo, photo_ext = _image_info(d)
+    side = _logo_side(d)
+    # Harvard is designed without a photo; the other templates reserve a media
+    # column for the photo and, when the logo is on the right, for the logo too.
+    allow_photo = template_name not in TEMPLATES_WITHOUT_PHOTO
+    logo_in_column = side == "right" and template_name not in (
+        "harvard", "sidebar", "sidebar-right",
+    )
+    logo_ref, has_photo, photo_ext = _image_info(
+        d, include_logo=logo_in_column, allow_photo=allow_photo
+    )
     parts = _image_parts(d, logo_ref, has_photo, photo_ext)
-    if template_name == "harvard":
-        return _header_harvard(d, L, parts)
-    if template_name == "modern":
-        return _header_modern(d, L, parts)
-    if template_name == "creative":
-        return _header_creative(d, L, parts)
-    if template_name == "chinese":
-        return _header_chinese(d, L, parts)
-    if template_name == "tabbed":
-        return _header_tabbed(d, L, parts)
-    if template_name == "ribbon":
-        return _header_ribbon(d, L, parts)
-    if template_name == "navy":
-        return _header_navy(d, L, parts)
-    if template_name == "playful":
-        return _header_playful(d, L, parts)
-    if template_name == "sword":
-        return _header_sword(d, L, parts)
     if template_name in ("sidebar", "sidebar-right"):
         return _header_sidebar(d, L, parts)
-    return _header_classic(d, L, parts)
+    if template_name == "harvard":
+        return _school_logo_block(d, side=side) + _header_harvard(d, L, parts)
+    if template_name == "modern":
+        content = _header_modern(d, L, parts)
+    elif template_name == "creative":
+        content = _header_creative(d, L, parts)
+    elif template_name == "chinese":
+        content = _header_chinese(d, L, parts)
+    elif template_name == "tabbed":
+        content = _header_tabbed(d, L, parts)
+    elif template_name == "ribbon":
+        content = _header_ribbon(d, L, parts)
+    elif template_name == "navy":
+        content = _header_navy(d, L, parts)
+    elif template_name == "playful":
+        content = _header_playful(d, L, parts)
+    elif template_name == "sword":
+        content = _header_sword(d, L, parts)
+    else:
+        content = _header_classic(d, L, parts)
+    # A left-corner logo is a letterhead above the header. A right-corner logo
+    # already lives in the reserved media column, so the left text keeps its x
+    # position and only the media column grows.
+    if side == "left":
+        return _school_logo_block(d, side="left") + content
+    return content
 
 
 def _work_entry(key, entry, idx, L=None):
@@ -1672,6 +1742,30 @@ def _font_chain(template, candidates):
     return body
 
 
+def _font_size_choice(p):
+    """Nearest article size plus an optional exact-size override.
+
+    `article` only accepts 10/11/12pt, so the class option gets the nearest
+    one. For any other requested size the preamble loads `scrextend` (KOMA)
+    when available, which redefines the relative size commands for the exact
+    value. If `scrextend.sty` is missing the document still compiles at the
+    nearest standard size instead of failing.
+    """
+    try:
+        requested = int(round(float(p.get("font_size", 11))))
+    except (TypeError, ValueError):
+        requested = 11
+    requested = min(max(requested, 8), 20)
+    nearest = min((10, 11, 12), key=lambda size: abs(size - requested))
+    block = ""
+    if requested not in (10, 11, 12):
+        block = (
+            "\\IfFileExists{scrextend.sty}"
+            "{\\usepackage[fontsize=%dpt]{scrextend}}{}\n" % requested
+        )
+    return nearest, block
+
+
 def build_tex(data, p):
     template_id = str(data.get("template", "classic") or "classic").strip().lower()
     if template_id not in TEMPLATES:
@@ -1686,8 +1780,14 @@ def build_tex(data, p):
         if not (line.lstrip().startswith("%") and "{{" in line)
     )
     # One shared macro for every template: the headers wrap the name in it so
-    # a long name shrinks instead of overflowing its band or column.
-    tex = tex.replace("\\begin{document}", _CVFITNAME_MACRO + "\\begin{document}", 1)
+    # a long name shrinks instead of overflowing its band or column. The font
+    # style override goes after it (still at the end of the preamble) so it
+    # wins over a template's own \familydefault (e.g. the playful template).
+    preamble = _CVFITNAME_MACRO
+    style = str(p.get("font_style") or "").strip().lower()
+    if style in FONT_STYLES:
+        preamble += "\\renewcommand{\\familydefault}{%s}\n" % _FONT_STYLE_FAMILY[style]
+    tex = tex.replace("\\begin{document}", preamble + "\\begin{document}", 1)
     L = LANG.get(str(data.get("cv_language", "zh")), LANG["zh"])
 
     # Free blocks are inserted after their anchor section; "start" and "end"
@@ -1729,6 +1829,7 @@ def build_tex(data, p):
     m = p["margins"]
     papers = {"a4": "a4paper", "letter": "letterpaper", "legal": "legalpaper"}
     paper = papers.get(str(p["paper"]), "a4paper")
+    font_size, size_block = _font_size_choice(p)
     if L is LANG["zh"]:
         font_engine = (
             "\\usepackage{fontspec}\n"
@@ -1743,12 +1844,12 @@ def build_tex(data, p):
             "\\usepackage{lmodern}"
         )
     tex = tex.replace("{{paper}}", paper)
-    tex = tex.replace("{{font_engine}}", font_engine)
+    tex = tex.replace("{{font_engine}}", size_block + font_engine)
     tex = tex.replace("{{margin_top}}", f"{m['top']:g}")
     tex = tex.replace("{{margin_bottom}}", f"{m['bottom']:g}")
     tex = tex.replace("{{margin_left}}", f"{m['left']:g}")
     tex = tex.replace("{{margin_right}}", f"{m['right']:g}")
-    tex = tex.replace("{{font_size}}", str(p["font_size"]))
+    tex = tex.replace("{{font_size}}", str(font_size))
     tex = tex.replace("{{sidebar}}", sidebar)
     tex = tex.replace("{{header}}", header)
     tex = tex.replace("{{body}}", body)

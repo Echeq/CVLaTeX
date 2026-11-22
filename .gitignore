@@ -63,3 +63,6 @@ templates/picture samples/
 
 # Personal reference file (kept on disk, never versioned)
 templates/chinese/Elvis Chen CV.docx
+
+# Local screen-recording sources (the curated clip lives in docs/media/videos/)
+assets/videos-ref/

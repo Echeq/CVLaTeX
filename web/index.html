@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CVLaTex — CV Editor</title>
+<title>CVLaTeX — CV Editor</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -53,9 +53,11 @@
         </div>
         <div class="sub"><span data-i18n="submenu_font_size">Font size</span>
           <div class="menu-drop subdrop">
+            <a data-accion="font:9">9 pt</a>
             <a data-accion="font:10">10 pt</a>
             <a data-accion="font:11">11 pt</a>
             <a data-accion="font:12">12 pt</a>
+            <a data-accion="font:14">14 pt</a>
           </div>
         </div>
         <div class="sub"><span data-i18n="submenu_template">CV template</span>
@@ -91,21 +93,41 @@
     <div class="menu">
       <button class="menu-btn" data-i18n="menu_add">Add</button>
       <div class="menu-drop">
-        <div class="sub"><span data-i18n="submenu_columns">Columns</span>
+        <div class="menu-heading" data-i18n="add_group_sections">Sections</div>
+        <div class="sub"><span data-i18n="add_std_sections">Add section</span>
           <div class="menu-drop subdrop">
-            <a data-accion="add:columns:1" data-i18n="columns_1">1 column</a>
-            <a data-accion="add:columns:2" data-i18n="columns_2">2 columns</a>
-            <a data-accion="add:columns:3" data-i18n="columns_3">3 columns</a>
+            <a data-accion="add:sect:summary" data-i18n="section_summary">Profile</a>
+            <a data-accion="add:sect:education" data-i18n="section_education">Education</a>
+            <a data-accion="add:sect:work" data-i18n="section_work">Work</a>
+            <a data-accion="add:sect:internships" data-i18n="section_internships">Internships</a>
+            <a data-accion="add:sect:projects" data-i18n="section_projects">Projects</a>
+            <a data-accion="add:sect:university_projects" data-i18n="section_university_projects">University projects</a>
+            <a data-accion="add:sect:skills" data-i18n="section_skills">Skills</a>
+            <a data-accion="add:sect:languages" data-i18n="section_languages">Languages</a>
+            <a data-accion="add:sect:references" data-i18n="section_references">References</a>
+            <hr>
+            <a data-accion="add:section" data-i18n="action_add_section">Custom section…</a>
+            <a data-accion="add:period" data-i18n="action_add_period">Period + description…</a>
+            <div class="sub"><span data-i18n="submenu_columns">Columns list</span>
+              <div class="menu-drop subdrop">
+                <a data-accion="add:columns:1" data-i18n="columns_1">1 column</a>
+                <a data-accion="add:columns:2" data-i18n="columns_2">2 columns</a>
+                <a data-accion="add:columns:3" data-i18n="columns_3">3 columns</a>
+              </div>
+            </div>
           </div>
         </div>
-        <a data-accion="add:period" data-i18n="action_add_period">Period + description…</a>
         <hr>
+        <div class="menu-heading" data-i18n="add_group_optional">Extras</div>
+        <a data-accion="add:socials" data-i18n="socials_title">Social networks</a>
+        <a data-accion="add:extra" data-i18n="section_extra">Extra details</a>
+        <hr>
+        <div class="menu-heading" data-i18n="add_group_separators">Separators</div>
         <a data-accion="add:block-line" data-i18n="action_add_line">Separator line</a>
         <a data-accion="add:block-band" data-i18n="action_add_band">Color band</a>
         <a data-accion="add:block-space" data-i18n="action_add_space">Blank space</a>
         <hr>
-        <a data-accion="add:section" data-i18n="action_add_section">Custom section…</a>
-        <a data-accion="manage-blocks" data-i18n="action_manage_blocks">Manage blocks…</a>
+        <a data-accion="manage-blocks" data-i18n="action_manage_blocks">Manage custom content…</a>
       </div>
     </div>
 
@@ -161,6 +183,7 @@
       <button id="zoom-75" class="small" data-accion="zoom:75" data-i18n-title="zoom_tip_75" title="Zoom 75%">75%</button>
       <button id="zoom-100" class="small active" data-accion="zoom:100" data-i18n-title="zoom_tip_100" title="Zoom 100%">100%</button>
       <button id="zoom-125" class="small" data-accion="zoom:125" data-i18n-title="zoom_tip_125" title="Zoom 125%">125%</button>
+      <button id="layout-toggle" class="small" data-i18n-title="layout_toggle" title="Switch between side-by-side and vertical layout">Vertical</button>
     </div>
     <div id="engine-warning" hidden>
       <span data-i18n="engine_warning">No LaTeX engine is configured. Preview and PDF export require one.</span>
@@ -200,12 +223,15 @@
 <div class="modal" id="modal-wizard" hidden>
   <div class="modal-box">
     <h2 data-i18n="wizard_title">LaTeX engine</h2>
-    <p data-i18n="wizard_p1">To generate the preview and export to PDF, CVLaTex needs a LaTeX engine on your computer.</p>
-    <p><span data-i18n="wizard_p2a">If you don't have one, CVLaTex can </span><b data-i18n="wizard_p2b">download and install TinyTeX automatically</b><span data-i18n="wizard_p2c"> (one time only, requires an internet connection).</span></p>
+    <p data-i18n="wizard_p1">To generate the preview and export to PDF, CVLaTeX needs a LaTeX engine on your computer.</p>
+    <p><span data-i18n="wizard_p2a">If you don't have one, CVLaTeX can </span><b data-i18n="wizard_p2b">download and install TinyTeX automatically</b><span data-i18n="wizard_p2c"> (one time only, requires an internet connection).</span></p>
     <div class="wizard-options">
       <button id="wz-install" class="primary" data-i18n="wizard_install">Download and install TinyTeX (recommended)</button>
       <button id="wz-have" data-i18n="wizard_have">I already have LaTeX installed</button>
       <button id="wz-manual" data-i18n="wizard_manual">Set the path manually…</button>
+      <button id="wz-from-file" data-i18n="wizard_from_file">Install from downloaded file…</button>
+      <a id="wz-download-page" href="https://github.com/rstudio/tinytex-releases/releases" target="_blank" rel="noopener" data-i18n="wizard_download_page">Download manually…</a>
+      <a id="wz-download-mirror" href="https://sourceforge.net/projects/tinytex-releases.mirror/files/" target="_blank" rel="noopener" data-i18n="wizard_download_mirror">SourceForge mirror…</a>
       <a id="wz-later" href="#" data-i18n="wizard_later">Not now</a>
     </div>
     <div id="wz-progress" hidden>
@@ -240,9 +266,27 @@
     <div class="field-row">
       <label for="pf-font-size" data-i18n="font_size">Font size</label>
       <select id="pf-font-size">
+        <option value="9">9 pt</option>
         <option value="10">10 pt</option>
         <option value="11">11 pt</option>
         <option value="12">12 pt</option>
+        <option value="14">14 pt</option>
+      </select>
+    </div>
+    <div class="field-row">
+      <label for="pf-font-style" data-i18n="font_style">Font style</label>
+      <select id="pf-font-style">
+        <option value="" data-i18n="font_style_template">Template default</option>
+        <option value="serif" data-i18n="font_style_serif">Serif</option>
+        <option value="sans" data-i18n="font_style_sans">Sans serif</option>
+        <option value="mono" data-i18n="font_style_mono">Monospace</option>
+      </select>
+    </div>
+    <div class="field-row">
+      <label for="pf-units" data-i18n="units_label">Measurement units</label>
+      <select id="pf-units">
+        <option value="cm" data-i18n="units_cm">Centimetres (cm)</option>
+        <option value="in" data-i18n="units_in">Inches (in)</option>
       </select>
     </div>
     <fieldset>
@@ -260,6 +304,14 @@
     <div class="field-row">
       <label for="pf-breakpoint" data-i18n="breakpoint_label">Stack panels when width is below (px)</label>
       <input type="number" id="pf-breakpoint" min="500" max="2000" step="10">
+    </div>
+    <div class="field-row">
+      <label for="pf-layout-mode" data-i18n="layout_mode">Layout</label>
+      <select id="pf-layout-mode">
+        <option value="auto" data-i18n="layout_auto">Automatic</option>
+        <option value="stacked" data-i18n="layout_stacked">Preview above form</option>
+        <option value="side" data-i18n="layout_side">Side by side</option>
+      </select>
     </div>
     <fieldset id="settings-colors">
       <legend data-i18n="document_colors">Document colors</legend>
@@ -297,6 +349,15 @@
         <button class="small" id="pf-engine-path" data-i18n="engine_change_path">Change path…</button>
         <button class="small" id="pf-engine-install" data-i18n="engine_install">Install TinyTeX</button>
       </div>
+      <div class="field-row">
+        <label for="pf-engine-mirror" data-i18n="engine_mirror">Download mirror (optional)</label>
+        <input type="url" id="pf-engine-mirror" data-i18n-placeholder="engine_mirror_placeholder" placeholder="https://…" spellcheck="false">
+      </div>
+      <p class="colors-note" data-i18n="engine_mirror_note">Leave empty to use GitHub. Paste a trusted mirror URL if GitHub is slow or blocked.</p>
+      <details id="pf-engine-diagnostics" hidden>
+        <summary data-i18n="engine_diagnostics">Diagnostics</summary>
+        <pre id="pf-engine-diagnostics-text"></pre>
+      </details>
     </fieldset>
     <p id="pf-message" class="settings-message"></p>
     <div class="modal-footer">
@@ -386,9 +447,86 @@
       <p><b data-i18n="help_entries_bold">Experience, education, etc.:</b><span data-i18n="help_entries_text"> use “Add” to create more entries and the ✕ button to delete them.</span></p>
       <p><b data-i18n="help_edit_bold">Edit:</b><span data-i18n="help_edit_text"> change the paper size, margins or document font.</span></p>
       <p><b data-i18n="help_sample_bold">Sample CV:</b><span data-i18n="help_sample_text"> “Edit → Load sample CV” fills the form with an example so you can see how to complete the fields.</span></p>
-      <p><b data-i18n="help_files_bold">Files:</b><span data-i18n="help_files_text"> save your CV as a CVLaTex file (.cvjson), export it to PDF or LaTeX code, or import it.</span></p>
+      <p><b data-i18n="help_files_bold">Files:</b><span data-i18n="help_files_text"> save your CV as a CVLaTeX file (.cvjson), export it to PDF or LaTeX code, or import it.</span></p>
       <p><b data-i18n="help_latex_bold">LaTeX code:</b><span data-i18n="help_latex_text"> from “Edit → View LaTeX code” you can view and edit the generated LaTeX code. When you return to the form, the code is regenerated from the data.</span></p>
       <p><b data-i18n="help_pdf_bold">Export PDF:</b><span data-i18n="help_pdf_text"> requires a LaTeX engine (TinyTeX installed automatically, or MiKTeX/TeX Live).</span></p>
+      <h3 class="help-section-title" data-i18n="help_markets_title">Dedicated to each market</h3>
+      <p class="help-note" data-i18n="help_markets_intro">Short local guidance. The full guide with sources is in the repository.</p>
+      <div id="help-markets">
+        <details class="help-market">
+          <summary data-i18n="help_market_us_title">United States</summary>
+          <ul>
+            <li data-i18n="help_market_us_b1">One page early in a career; two pages maximum.</li>
+            <li data-i18n="help_market_us_b2">US Letter paper; reverse chronological order.</li>
+            <li data-i18n="help_market_us_b3">No photo, age, date of birth, marital status or nationality.</li>
+            <li data-i18n="help_market_us_b4">Quantify achievements and mirror the job posting keywords.</li>
+            <li data-i18n="help_market_us_b5">Use standard headings and a single column for ATS.</li>
+            <li data-i18n="help_market_us_b6">Students: education first, then projects, internships and campus work.</li>
+          </ul>
+          <p><a class="help-market-link" data-i18n="help_market_full_guide" href="https://github.com/Echeq/CVLaTex/blob/main/docs/markets/en-US.md" target="_blank" rel="noopener">Full guide</a></p>
+        </details>
+        <details class="help-market">
+          <summary data-i18n="help_market_uk_title">United Kingdom</summary>
+          <ul>
+            <li data-i18n="help_market_uk_b1">Two A4 pages maximum; one page is fine early on.</li>
+            <li data-i18n="help_market_uk_b2">No photo, date of birth, age, marital status or nationality.</li>
+            <li data-i18n="help_market_uk_b3">Open with a short personal statement.</li>
+            <li data-i18n="help_market_uk_b4">Reverse chronological; British spelling and day-first dates.</li>
+            <li data-i18n="help_market_uk_b5">Use standard headings and keywords; keep it ATS-friendly.</li>
+            <li data-i18n="help_market_uk_b6">Students: education first, then placements, projects and volunteering.</li>
+          </ul>
+          <p><a class="help-market-link" data-i18n="help_market_full_guide" href="https://github.com/Echeq/CVLaTex/blob/main/docs/markets/en-GB.md" target="_blank" rel="noopener">Full guide</a></p>
+        </details>
+        <details class="help-market">
+          <summary data-i18n="help_market_es_title">Spain</summary>
+          <ul>
+            <li data-i18n="help_market_es_b1">One or two A4 pages; reverse chronological order.</li>
+            <li data-i18n="help_market_es_b2">A photo is common but optional; use a professional one if you want.</li>
+            <li data-i18n="help_market_es_b3">Spanish, with English for multinationals.</li>
+            <li data-i18n="help_market_es_b4">Education first when you have little experience.</li>
+            <li data-i18n="help_market_es_b5">Include languages and digital skills; tailor the CV to the offer.</li>
+            <li data-i18n="help_market_es_b6">Europass is optional; do not send it unedited.</li>
+          </ul>
+          <p><a class="help-market-link" data-i18n="help_market_full_guide" href="https://github.com/Echeq/CVLaTex/blob/main/docs/markets/es-ES.md" target="_blank" rel="noopener">Full guide</a></p>
+        </details>
+        <details class="help-market">
+          <summary data-i18n="help_market_latam_title">Latin America</summary>
+          <ul>
+            <li data-i18n="help_market_latam_b1">Conventions vary by country: check the posting and local style.</li>
+            <li data-i18n="help_market_latam_b2">One or two pages; Colombia accepts up to three, Mexico prefers one.</li>
+            <li data-i18n="help_market_latam_b3">A photo is common but increasingly optional.</li>
+            <li data-i18n="help_market_latam_b4">Keep personal data minimal: no ID number or full address.</li>
+            <li data-i18n="help_market_latam_b5">Spanish; localize job titles and dates.</li>
+            <li data-i18n="help_market_latam_b6">Students: education first, then internships and projects.</li>
+          </ul>
+          <p><a class="help-market-link" data-i18n="help_market_full_guide" href="https://github.com/Echeq/CVLaTex/blob/main/docs/markets/es-LATAM.md" target="_blank" rel="noopener">Full guide</a></p>
+        </details>
+        <details class="help-market">
+          <summary data-i18n="help_market_cn_title">China</summary>
+          <ul>
+            <li data-i18n="help_market_cn_b1">One A4 page; two only with substantial experience.</li>
+            <li data-i18n="help_market_cn_b2">Education first for fresh graduates; internships and projects next.</li>
+            <li data-i18n="help_market_cn_b3">A professional ID photo is expected in most campus and state-owned applications; include one unless the posting says otherwise.</li>
+            <li data-i18n="help_market_cn_b4">Keep personal data minimal: name, phone, email; no ID number.</li>
+            <li data-i18n="help_market_cn_b5">Political status only for state-owned employers or civil service.</li>
+            <li data-i18n="help_market_cn_b6">Simple black layout, standard fonts, tailored keywords and no typos.</li>
+            <li data-i18n="help_market_cn_b7">Prefer a single-column layout; sidebars and creative two-column designs are not the norm outside design roles.</li>
+          </ul>
+          <p><a class="help-market-link" data-i18n="help_market_full_guide" href="https://github.com/Echeq/CVLaTex/blob/main/docs/markets/zh-CN.md" target="_blank" rel="noopener">Full guide</a></p>
+        </details>
+        <details class="help-market">
+          <summary data-i18n="help_market_ru_title">Russia</summary>
+          <ul>
+            <li data-i18n="help_market_ru_b1">One or two A4 pages; reverse chronological order.</li>
+            <li data-i18n="help_market_ru_b2">A photo is common but optional; use a neutral portrait.</li>
+            <li data-i18n="help_market_ru_b3">hh.ru structure: position, contacts, about, experience, education, skills.</li>
+            <li data-i18n="help_market_ru_b4">Quantify achievements; tailor keywords to the vacancy.</li>
+            <li data-i18n="help_market_ru_b5">Age and gender are common but optional; discrimination is prohibited.</li>
+            <li data-i18n="help_market_ru_b6">Russian CV labels are not available yet; content can be written in Russian.</li>
+          </ul>
+          <p><a class="help-market-link" data-i18n="help_market_full_guide" href="https://github.com/Echeq/CVLaTex/blob/main/docs/markets/ru-RU.md" target="_blank" rel="noopener">Full guide</a></p>
+        </details>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="primary small" data-accion="close-modal" data-i18n="close">Close</button>
@@ -400,12 +538,13 @@
   <div class="modal-box small">
     <h2 data-i18n="credits_title">Credits</h2>
     <div class="help-text">
-      <p><b>CVLaTex</b><span data-i18n="credits_slogan"> — Standardized, professional CVs without the hassle.</span></p>
+      <p><b>CVLaTeX</b><span data-i18n="credits_slogan"> — Standardized, professional CVs without the hassle.</span></p>
+      <p data-i18n="credits_audience">For everyone: students, recent graduates and professionals, with or without a university degree.</p>
       <p><span data-i18n="credits_developed">Developed by:</span> <span class="credits-name">CHEN QIU ELVIS ENRIQUE</span></p>
       <p><span data-i18n="credits_github">GitHub:</span> <a href="https://github.com/ECHEQ" rel="noopener" target="_blank">ECHEQ</a></p>
       <p><span data-i18n="credits_linkedin">LinkedIn:</span> <a href="https://www.linkedin.com/in/ECHEQ" rel="noopener" target="_blank">ECHEQ</a></p>
-      <p><span data-i18n="credits_version">Version:</span> v0.3.0</p>
-      <p data-i18n="credits_story">CVLaTex was born so that any university student can build their CV for free and portably, with no accounts, subscriptions or microtransactions: a comfortable editor that produces a standard-format CV and compiles it to a professional PDF, all on your own machine.</p>
+      <p><span data-i18n="credits_version">Version:</span> v1.0.0</p>
+      <p data-i18n="credits_story">CVLaTeX was born so that any university student can build their CV for free and portably, with no accounts, subscriptions or microtransactions: a comfortable editor that produces a standard-format CV and compiles it to a professional PDF, all on your own machine.</p>
       <p data-i18n="credits_tinytex">Thanks to TinyTeX for the portable LaTeX distribution.</p>
     </div>
     <div class="modal-footer">
@@ -429,6 +568,10 @@
   <div class="modal-box">
     <h2 data-i18n="crop_title">Adjust photo area</h2>
     <p data-i18n="crop_help">Drag the box to move it and the corners to adjust the area shown in the CV.</p>
+    <div class="field-row crop-ratio-row">
+      <label for="crop-ratio" data-i18n="crop_ratio">Shape</label>
+      <select id="crop-ratio"></select>
+    </div>
     <div id="crop-container"></div>
     <div class="modal-footer">
       <button class="small" id="crop-cancel" data-i18n="cancel">Cancel</button>

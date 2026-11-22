@@ -20,7 +20,7 @@ import latex_gen  # noqa: E402
 
 LANGUAGES = ("es", "en", "zh")
 
-# The nine sections every sample must fill in.
+# The filled sections every sample must carry. References are optional.
 SECTIONS = (
     "summary",
     "education",
@@ -30,7 +30,6 @@ SECTIONS = (
     "work",
     "skills",
     "languages",
-    "references",
 )
 LIST_SECTIONS = tuple(section for section in SECTIONS if section != "summary")
 
@@ -80,8 +79,7 @@ def _story_shape(data):
             for entry in data[section]
         ],
         "socials": [social.get("value", "") for social in data["socials"]],
-        "emails": [data["email"]]
-        + [reference.get("contact", "") for reference in data["references"]],
+        "emails": [data["email"]],
         "counts": {section: len(data[section]) for section in LIST_SECTIONS},
     }
 
@@ -115,18 +113,26 @@ def test_samples_share_dates_links_emails_and_entry_counts():
 
 @pytest.mark.parametrize("lang", LANGUAGES)
 def test_sample_uses_the_project_identity(lang):
-    """Every language carries the same fictional name and handles, and no website social."""
+    """Every language carries the same public identity and handles."""
     data = ejemplo.sample_data(lang)
+    names = {
+        "es": "ELVIS ENRIQUE CHEN QIU",
+        "en": "ELVIS ENRIQUE CHEN QIU",
+        "zh": "陈昌发",
+    }
 
-    assert data["name"] == "ALEJANDRO RUIZ MARTÍN"
+    assert data["name"] == names[lang]
+    assert data["email"] == "echeq@github.com"
+    assert data["phone"] == "123-456-78"
     socials = {
         social.get("network"): social.get("value") for social in data["socials"]
     }
-    assert socials["github"] == "github.com/example"
-    assert socials["linkedin"] == "linkedin.com/in/example"
+    assert socials["github"] == "github.com/ECHEQ"
+    assert socials["linkedin"] == "linkedin.com/in/ECHEQ"
     assert "website" not in socials
     for project in data["projects"]:
-        assert project["link"].startswith("github.com/example/")
+        assert project["link"].startswith("github.com/ECHEQ/")
+    assert "HUST" in data["education"][0]["institution"] or "华中科技大学" in data["education"][0]["institution"]
 
 
 @pytest.mark.parametrize("lang", LANGUAGES)

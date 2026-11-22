@@ -22,7 +22,8 @@ CLAVES_ESPERADAS = {
     "cv_language", "template", "name", "profession", "email", "phone",
     "address", "socials", "extra_fields", "photo", "photo_original",
     "photo_crop", "photo_width_cm", "photo_height_cm", "school_name",
-    "school_logo", "school_logo_width_cm", "school_logo_height_cm", "summary",
+    "school_logo", "school_logo_original", "school_logo_crop", "school_logo_side",
+    "school_logo_width_cm", "school_logo_height_cm", "summary",
     "work", "internships", "projects", "university_projects", "education",
     "skills", "languages", "references", "blocks", "columns",
     "section_titles", "hidden_sections", "section_order",
@@ -30,7 +31,8 @@ CLAVES_ESPERADAS = {
 
 CLAVES_TEXTO = (
     "name", "profession", "email", "phone", "address",
-    "school_name", "school_logo", "summary", "photo", "photo_original",
+    "school_name", "school_logo", "school_logo_original", "school_logo_side",
+    "summary", "photo", "photo_original",
 )
 
 CLAVES_LISTA = (
@@ -63,6 +65,8 @@ def test_datos_vacios_tipos_y_valores_por_defecto():
     for clave in CLAVES_MEDIDA:
         assert isinstance(d[clave], float), clave
     assert d["photo_crop"] is None
+    assert d["school_logo_crop"] is None
+    assert d["school_logo_side"] == "left"
     assert d["section_titles"] == {}
     assert d["hidden_sections"] == []
     assert d["section_order"] == []
@@ -548,6 +552,7 @@ PREFS_PRUEBA = {
     "paper": "a4",
     "margins": {"top": 2.0, "bottom": 2.0, "left": 2.0, "right": 2.0},
     "font_size": 11,
+    "font_style": "",
 }
 
 

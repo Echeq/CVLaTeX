@@ -42,7 +42,8 @@ FROZEN_API = {
     "init", "empty_data", "load_sample", "template_colors", "choose_file",
     "choose_photo", "save_image", "export_pdf", "export_tex", "export_docx",
     "export_cv", "open_cv", "autosave", "autosave_read", "autosave_clear",
-    "import_tex", "install_latex", "cancel_install", "choose_latex_path",
+    "import_tex", "install_latex", "install_latex_from_file",
+    "cancel_install", "choose_latex_path",
     "check_latex", "open_preview", "set_prefs", "get_prefs", "dismiss_setup",
     "compile", "compile_tex", "set_dirty", "quit_app",
 }
@@ -61,13 +62,19 @@ FROZEN_ACTIONS = (
     "new", "open", "save", "export-pdf", "export-tex", "export-docx",
     "import-tex", "settings", "undo", "redo", "paper:a4", "paper:letter",
     "paper:legal", "margins:normal", "margins:narrow", "margins:custom",
-    "font:10", "font:11", "font:12", "template:classic", "template:harvard",
+    "font:9", "font:10", "font:11", "font:12", "font:14",
+    "template:classic", "template:harvard",
     "template:modern", "template:creative", "template:chinese",
     "template:tabbed", "template:ribbon", "template:navy", "template:playful",
     "template:sword",
     "load-sample", "reset-all",
     "add:columns:1", "add:columns:2", "add:columns:3", "add:period",
     "add:block-line", "add:block-band", "add:block-space", "add:section",
+    "add:socials", "add:extra",
+    "add:sect:summary", "add:sect:education", "add:sect:work",
+    "add:sect:internships", "add:sect:projects",
+    "add:sect:university_projects", "add:sect:skills",
+    "add:sect:languages", "add:sect:references",
     "manage-blocks", "recompile", "toggle:auto-compile", "toggle:latex",
     "theme:light", "theme:dark", "theme:system", "help", "credits",
     "setup-engine", "close-modal", "zoom:75", "zoom:100", "zoom:125",
@@ -99,6 +106,11 @@ FROZEN_IDS = (
     "pf-color-secondary", "pf-color-secondary-wheel", "pf-color-secondary-reset",
     "pf-color-text", "pf-color-text-wheel", "pf-color-text-reset",
     "pf-color-gray", "pf-color-gray-wheel", "pf-color-gray-reset",
+    "pf-font-size", "pf-font-style",
+    "help-markets", "layout-toggle", "pf-layout-mode", "pf-engine-mirror",
+    "pf-engine-diagnostics",
+    "pf-engine-diagnostics-text", "wz-from-file", "wz-download-page",
+    "wz-download-mirror",
     "ui-language", "startup-language", "language-continue",
     "install-cancel", "latex-panel", "latex-text",
     "confirm-message", "confirm-cancel", "confirm-accept", "confirm-exit",
@@ -227,11 +239,17 @@ def test_i18n_credits_keys():
         "credits_version": {
             "es": "Versión:", "en": "Version:", "zh": "版本：", "ru": "Версия:",
         },
+        "credits_audience": {
+            "es": "Para todos: estudiantes, recién graduados y profesionales, con o sin título universitario.",
+            "en": "For everyone: students, recent graduates and professionals, with or without a university degree.",
+            "zh": "适合所有人：学生、应届毕业生和职场人士，无论是否有大学学历。",
+            "ru": "Для всех: студентов, выпускников и специалистов — с высшим образованием или без него.",
+        },
         "credits_story": {
-            "es": "CVLaTex nació para que cualquier universitario pueda crear su CV gratis y de forma portable, sin cuentas, suscripciones ni microtransacciones: un editor cómodo que genera un CV en formato estándar y lo compila a un PDF profesional, todo en tu propio equipo.",
-            "en": "CVLaTex was born so that any university student can build their CV for free and portably, with no accounts, subscriptions or microtransactions: a comfortable editor that produces a standard-format CV and compiles it to a professional PDF, all on your own machine.",
-            "zh": "CVLaTex 的初衷是让每位大学生都能免费、便携地制作简历，没有账号、订阅或微交易：一个顺手的编辑器，生成标准格式的简历并编译为专业 PDF，一切都在你自己的电脑上完成。",
-            "ru": "CVLaTex создан для того, чтобы любой студент мог бесплатно и портативно сделать своё резюме — без аккаунтов, подписок и микротранзакций: удобный редактор, который формирует резюме стандартного формата и компилирует его в профессиональный PDF прямо на вашем компьютере.",
+            "es": "CVLaTeX nació para que cualquier persona pueda crear su CV gratis y de forma portable, sin cuentas, suscripciones ni microtransacciones: un editor cómodo que genera un CV en formato estándar y lo compila a un PDF profesional, todo en tu propio equipo.",
+            "en": "CVLaTeX was born so that anyone can build their CV for free and portably, with no accounts, subscriptions or microtransactions: a comfortable editor that produces a standard-format CV and compiles it to a professional PDF, all on your own machine.",
+            "zh": "CVLaTeX 的初衷是让任何人都能免费、便携地制作简历，没有账号、订阅或微交易：一个顺手的编辑器，生成标准格式的简历并编译为专业 PDF，一切都在你自己的电脑上完成。",
+            "ru": "CVLaTeX создан для того, чтобы любой человек мог бесплатно и портативно сделать своё резюме — без аккаунтов, подписок и микроплатежей: удобный редактор, который формирует резюме стандартного формата и компилирует его в профессиональный PDF на вашем компьютере.",
         },
     }
     for key, values in expected.items():
@@ -381,10 +399,60 @@ def test_index_uses_i18n_attributes():
         assert not unresolved, (lang, unresolved)
 
 
+def test_settings_offer_font_style_and_sizes():
+    """Settings exposes the low-risk typography controls (no system fonts)."""
+    style = re.search(r'<select id="pf-font-style">(.*?)</select>', HTML, re.S)
+    assert style, "font style select not found"
+    assert re.findall(r'<option value="([a-z]*)"', style.group(1)) == [
+        "", "serif", "sans", "mono",
+    ]
+    size = re.search(r'<select id="pf-font-size">(.*?)</select>', HTML, re.S)
+    assert size, "font size select not found"
+    assert re.findall(r'<option value="(\d+)"', size.group(1)) == [
+        "9", "10", "11", "12", "14",
+    ]
+
+
+def test_help_market_guides_link_to_docs():
+    """Help shows six market summaries and links to the full repository guides."""
+    help_modal = HTML[HTML.index('id="modal-help"'):HTML.index('id="modal-credits"')]
+    assert 'id="help-markets"' in help_modal
+    assert help_modal.count('class="help-market"') == 6
+    for market in ("en-US", "en-GB", "es-ES", "es-LATAM", "zh-CN", "ru-RU"):
+        assert "docs/markets/%s.md" % market in help_modal
+
+
+def test_add_menu_has_sections_extras_and_separators_hierarchy():
+    """Add puts structured content first, extras next and separators last."""
+    add = HTML[HTML.index('data-i18n="menu_add"'):HTML.index('data-i18n="menu_theme"')]
+    assert 'data-i18n="add_group_sections"' in add
+    assert 'data-i18n="add_group_optional"' in add
+    assert 'data-i18n="add_group_separators"' in add
+    assert add.index("add_group_sections") < add.index("add:sect:summary")
+    assert add.index("add:sect:references") < add.index("add_group_optional")
+    assert add.index("add_group_optional") < add.index("add:socials")
+    assert add.index("add:extra") < add.index("add_group_separators")
+    assert add.index("add_group_separators") < add.index("add:block-line")
+    # Custom sections and list blocks live under Sections, not under a
+    # separate "Blocks" group.
+    assert add.index("add_group_sections") < add.index("add:section")
+    assert add.index("add_group_sections") < add.index("add:period")
+    assert add.index("add_group_sections") < add.index("add:columns:1")
+
+
+def test_custom_content_card_is_hidden_when_empty():
+    form = _function_body("renderForm")
+    assert "if (currentBlocks().length)" in form
+    assert 't("section_blocks")' in form
+    body = _function_body("deleteBlock")
+    assert "if (!currentBlocks().length) renderForm();" in body
+
+
 def test_index_credits_modal_content():
     """Credits: slogan, literal author, GitHub/LinkedIn/version lines and story; placeholders gone."""
     modal = HTML[HTML.index('id="modal-credits"'):HTML.index('id="modal-confirm"')]
     assert 'data-i18n="credits_slogan"' in modal
+    assert 'data-i18n="credits_audience"' in modal
     assert 'data-i18n="credits_developed"' in modal
     assert '<span class="credits-name">CHEN QIU ELVIS ENRIQUE</span>' in modal
     # The GitHub handle is an anchor: pywebview's Windows WebView2 backend
@@ -806,6 +874,61 @@ def test_app_socials_card():
     assert "function socialNetworkLabel(" in JS
 
 
+def test_app_form_starts_with_personal_and_add_sections_hint():
+    """A new CV keeps only Personal info and points to Add for sections."""
+    form = _function_body("renderForm")
+    assert "sectionHasContent" in form
+    assert "visibleSections" in form
+    assert "state.showSections" in JS
+    assert "function addSection(" in JS
+    assert 'data-accion="add:sect:summary"' in HTML
+    assert 'data-i18n="add_std_sections"' in HTML
+    assert 'data-accion="add:sect:education"' in HTML
+    assert 'data-accion="add:sect:skills"' in HTML
+
+
+def test_app_can_remove_a_section():
+    """Sections added from Add can be removed with confirmation."""
+    card = _function_body("sectionCard")
+    assert "section-remove-button" in card
+    assert "askConfirm(" in card
+    assert "removeSection(key, text)" in card
+    body = _function_body("removeSection")
+    assert "state.data[key] = []" in body
+    assert "delete state.showSections[key]" in body
+    assert 't("toast_section_removed")' in body
+
+
+def test_added_blocks_open_the_editor_from_their_row():
+    """Clicking a list/custom block opens its editor; Add focuses new fields."""
+    block = _function_body("blockRow")
+    assert "openListBlockModal(block.mode, block)" in block
+    assert "openCustomSectionModal(block)" in block
+    assert 'header.title = t("edit")' in block
+    assert "scrollToBlock" in JS
+    section = _function_body("addSection")
+    assert "state.data[key].push({})" in section
+    assert "first.focus()" in section
+    optional = _function_body("addOptionalSection")
+    assert "first.focus()" in optional
+
+
+def test_app_optional_sections_start_hidden_and_come_from_add():
+    """Social networks and Extra details are hidden until the user adds them."""
+    form = _function_body("renderForm")
+    assert "socialEntries.length" in form
+    assert "extraEntries.length" in form
+    assert 'id = "card-socials"' in form
+    assert 'id = "card-extra"' in form
+    assert 'data-accion="add:socials"' in HTML
+    assert 'data-accion="add:extra"' in HTML
+    assert 'data-i18n="add_group_optional"' in HTML
+    assert 'sample.dataset.accion = "load-sample"' in form
+    assert "function addOptionalSection(" in JS
+    assert 'case "add:socials"' in JS
+    assert 'case "add:extra"' in JS
+
+
 def test_app_socials_networks_and_label_toggle():
     """The 11 network values and the custom-name toggle when network == other."""
     m = re.search(r"const SOCIAL_NETWORKS = \[(.*?)\n\];", JS, re.S)
@@ -912,6 +1035,96 @@ def _close_guard_body():
     start = JS.index("window.__onCloseRequest = function () {")
     end = JS.index("\n};", start)
     return JS[start:end]
+
+
+def test_logo_crop_is_locked_and_saved_as_png():
+    open_body = _function_body("openCrop")
+    assert 'mode === "logo"' in open_body
+    assert "_crop.ratio = isLogo ? 3 : null" in open_body
+    assert '"crop_logo_title"' in open_body
+    assert '"crop_logo_help"' in open_body
+    assert "populateCropRatios(isLogo)" in open_body
+    apply_body = JS[JS.index('$("#crop-apply").addEventListener'):]
+    apply_body = apply_body[:apply_body.index("\n  });")]
+    assert '_crop.mode === "logo"' in apply_body
+    assert 'canvas.toDataURL("image/png")' in apply_body
+    assert 'api.save_image(dataUrl, "logo")' in apply_body
+    assert "state.data.school_logo = saved.path" in apply_body
+    field = _function_body("personalLogoField")
+    assert 'state.data.school_logo_original = path' in field
+    assert 'normalizeImage(r.url, 1024, "image/png")' in field
+    assert "openCrop(\"logo\")" in field
+    assert 't("adjust_area")' in field
+
+
+def test_photo_units_and_logo_side_preferences():
+    prefs_setup = _function_body("setupPrefs")
+    assert '"#pf-units"' in prefs_setup
+    assert 'api.set_prefs("units"' in prefs_setup
+    photo = _function_body("photoRow")
+    assert "cmToUnit(" in photo
+    assert "unitToCm(" in photo
+    assert 't("width_label")' in photo
+    assert 't("height_label")' in photo
+    logo = _function_body("personalLogoField")
+    assert 't("logo_side_label")' in logo
+    assert 't("logo_side_left")' in logo
+    assert 't("logo_side_right")' in logo
+    assert "state.data.school_logo_side" in logo
+    assert 'id="pf-units"' in HTML
+    assert 'id="crop-ratio"' in HTML
+
+
+def test_harvard_hides_the_photo_field():
+    assert 'TEMPLATES_WITHOUT_PHOTO = new Set(["harvard"])' in JS
+    assert 't("photo_not_supported")' in _function_body("photoRow")
+    assert "renderForm();" in _function_body("applyTemplate")
+    match = re.search(r"TEMPLATES_WITHOUT_PHOTO = new Set\(\[(.*?)\]\)", JS)
+    values = set(re.findall(r'"([^"]+)"', match.group(1)))
+    assert values == set(latex_gen.TEMPLATES_WITHOUT_PHOTO)
+
+
+def test_form_switches_to_one_column_on_narrow_panels():
+    body = _function_body("applyResponsive")
+    assert '"form-narrow"' in body
+    assert "formWidth < 620" in body
+    assert "body.form-narrow .fields { grid-template-columns: 1fr; }" in CSS
+    assert "body.form-narrow .photo-row" in CSS
+    logo = _function_body("personalLogoField")
+    assert 'fieldDiv.className = "field wide"' in logo
+    assert "logo-preview" in logo
+    assert "remove.hidden = !hasLogo" in logo
+
+
+def test_school_logo_is_optional_and_has_a_crop_flow():
+    body = _function_body("personalLogoField")
+    assert 't("school_logo_hint")' in body
+    assert 't("choose_logo")' in body
+    # The user can set the letterhead size in cm; the layout clamps it to the
+    # available media column/bar so it cannot break the distribution.
+    assert "school_logo_width_cm" in body
+    assert "school_logo_height_cm" in body
+    assert 't("width_label") + " (cm)"' in body
+    assert 't("height_label") + " (cm)"' in body
+
+
+def test_app_close_guard_clears_a_stuck_splitter_drag():
+    """The close guard must not open under the z-index 80 resize veil."""
+    body = _close_guard_body()
+    assert "stopSplitterDrag();" in body
+    assert "focusConfirmPrimary();" in body
+    splitter = _function_body("setupSplitter")
+    assert "_splitterRelease = release;" in splitter
+    assert 'splitter.setPointerCapture(e.pointerId)' in splitter
+    assert '"lostpointercapture"' in splitter
+    assert 'window.addEventListener("blur"' in splitter
+    assert '"visibilitychange"' in splitter
+    assert "stopSplitterDrag();" in _function_body("askConfirm")
+    # Modals sit above the resize veil and their footer wraps in narrow windows.
+    assert "z-index: 100;" in CSS
+    assert "flex-wrap: wrap;" in CSS
+    assert "body.stacked #modal-confirm .modal-footer" in CSS
+    assert "min-height: 38px" in CSS
 
 
 def test_app_close_guard_tokens():
@@ -1055,9 +1268,12 @@ def test_i18n_recovery_offers_a_restore_point():
 def test_app_installer_cancel_tokens():
     assert "api.cancel_install(" in JS
     assert "api.install_latex(" in JS
+    assert "api.install_latex_from_file(" in JS
     assert '"#install-cancel"' in JS
     assert 'id="install-cancel"' in HTML
     assert '"#modal-wizard"' in JS
+    assert '"#wz-from-file"' in JS
+    assert '"#pf-engine-mirror"' in JS
 
 
 def test_app_install_warning_tokens():
@@ -1162,19 +1378,53 @@ def test_app_uses_english_prefs_keys():
     for token in (
         'set_prefs("paper"',
         'set_prefs("font_size"',
+        'set_prefs("font_style"',
+        'set_prefs("tinytex_url"',
         'set_prefs("auto_compile"',
         'set_prefs("theme"',
         'set_prefs("colors"',
         'set_prefs("margins"',
         'set_prefs("split"',
+        'set_prefs("split_vertical"',
+        'set_prefs("layout_mode"',
         'set_prefs("ui_language"',
         "state.prefs.auto_compile",
         "state.prefs.font_size",
+        "state.prefs.font_style",
+        "state.prefs.tinytex_url",
+        "state.prefs.split_vertical",
+        "state.prefs.layout_mode",
     ):
         assert token in JS, token
     for token in ('set_prefs("papel"', 'set_prefs("fuente"', 'set_prefs("autocompilar"',
                   'set_prefs("tema"', 'set_prefs("colores"', 'set_prefs("margenes"'):
         assert token not in JS, token
+
+
+def test_app_stacks_narrow_or_vertical_windows():
+    """A half-screen portrait window stacks preview above the form."""
+    assert "width <= breakpoint" in JS
+    assert "width <= height" in JS
+    assert "window.innerHeight * 1.25" in JS
+    assert "ResizeObserver" in JS
+    assert "getBoundingClientRect" in JS
+    assert "applyVerticalSplit" in JS
+    assert 'set_prefs("split_vertical"' in JS
+    assert "--preview-height" in JS
+    assert "aria-orientation" in JS
+    assert 'id="layout-toggle"' in HTML
+    assert "layout_switch_to_stacked" in JS
+    assert "layout_switch_to_side" in JS
+
+    content = _css_block("body.stacked #content")
+    assert "flex-direction: column" in content
+    preview = _css_block("body.stacked #preview-area")
+    assert "order: 1" in preview and "--preview-height" in preview
+    form = _css_block("body.stacked #form-area")
+    assert "order: 3" in form
+    splitter = _css_block("body.stacked #splitter")
+    assert "display: flex" in splitter
+    assert "cursor: row-resize" in splitter
 
 
 # ---------------- CSS ----------------

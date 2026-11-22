@@ -33,6 +33,7 @@ PREFS_PRUEBA = {
     "paper": "a4",
     "margins": {"top": 2.0, "bottom": 2.0, "left": 2.0, "right": 2.0},
     "font_size": 11,
+    "font_style": "",
 }
 
 #: Every template the Word export has to mirror.
@@ -822,10 +823,33 @@ def test_exportar_docx_incrusta_foto_y_logo_en_dos_columnas(tmp_path):
 
     assert len(doc.tables[0].columns) == 2
     assert len(doc.inline_shapes) == 2
-    # The images are right-aligned in their cell (the logo paragraph is the
-    # direct child; the framed photo lives in a nested table).
+    # The school logo is a letterhead paragraph above the header table; the
+    # framed photo lives in a nested table inside the right cell.
+    assert any(p._p.xpath(".//w:drawing") for p in doc.paragraphs)
     derecha = doc.tables[0].rows[0].cells[1]
-    assert any(p.alignment == WD_ALIGN_PARAGRAPH.RIGHT for p in derecha.paragraphs)
+    assert derecha.tables
+
+
+def test_exportar_docx_logo_side_right_aligns_the_letterhead(tmp_path):
+    d = _datos_docx()
+    d["school_logo"] = _imagen_temporal(tmp_path, "logo.png")
+    d["school_logo_side"] = "right"
+    doc = _exportar(d, tmp_path, "logo_derecha.docx")
+
+    # The logo shares the reserved media column, not a separate top paragraph.
+    right = doc.tables[0].rows[0].cells[1]
+    assert any(p._p.xpath(".//w:drawing") for p in right.paragraphs)
+    assert any(p.alignment == WD_ALIGN_PARAGRAPH.RIGHT for p in right.paragraphs)
+    assert not any(p._p.xpath(".//w:drawing") for p in doc.paragraphs)
+
+
+def test_exportar_docx_harvard_ignores_the_photo(tmp_path):
+    d = _datos_docx()
+    d["template"] = "harvard"
+    d["photo"] = _imagen_temporal(tmp_path, "foto.png")
+    doc = _exportar(d, tmp_path, "harvard_sin_foto.docx")
+
+    assert len(doc.inline_shapes) == 0
 
 
 def test_exportar_docx_rutas_de_imagen_invalidas_se_ignoran(tmp_path):
@@ -1081,6 +1105,28 @@ def test_docx_firma_de_plantilla(tmp_path, template):
 
     _assert_normal_fonts(doc, template)
     _assert_template_signature(doc, template, d, palette)
+
+
+@pytest.mark.parametrize(
+    "style,expected",
+    [
+        ("", docx_gen.SERIF_FONT),
+        ("serif", docx_gen.SERIF_FONT),
+        ("sans", docx_gen.SANS_FONT),
+        ("mono", docx_gen.MONO_FONT),
+        ("unknown", docx_gen.SERIF_FONT),
+    ],
+)
+def test_docx_font_style_overrides_the_profile(tmp_path, style, expected):
+    """The font_style pref wins over the template profile; unknown is ignored."""
+    prefs = dict(PREFS_PRUEBA, font_style=style)
+    path = tmp_path / ("style_%s.docx" % (style or "template"))
+    docx_gen.export(_datos_con_plantilla("classic"), prefs, str(path))
+    doc = Document(str(path))
+    assert doc.styles["Normal"].font.name == expected
+    fonts = _normal_rfonts(doc)
+    assert fonts.get("ascii") == expected
+    assert fonts.get("hAnsi") == expected
 
 
 def test_docx_arbol_de_tablas_como_mucho_dos_niveles(tmp_path):

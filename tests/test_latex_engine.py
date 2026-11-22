@@ -144,6 +144,7 @@ def test_find_pdflatex_looks_inside_tinyttex_per_os(prefs_tmp, monkeypatch):
     tiny = prefs_tmp / "tinytex"
     monkeypatch.setattr(prefs, "TINYTEX_DIR", str(tiny))
     monkeypatch.setattr(latex_engine, "_check", lambda path: True)
+    monkeypatch.setattr(latex_engine, "_common_engine_paths", lambda platform=None: [])
     monkeypatch.setattr(latex_engine.shutil, "which", lambda name: None)
     assert latex_engine.find_pdflatex("win32") is None
 
@@ -171,6 +172,7 @@ def test_find_xelatex_uses_the_per_os_name(prefs_tmp, monkeypatch):
     tiny = prefs_tmp / "tinytex"
     monkeypatch.setattr(prefs, "TINYTEX_DIR", str(tiny))
     monkeypatch.setattr(latex_engine, "_check", lambda path: True)
+    monkeypatch.setattr(latex_engine, "_common_engine_paths", lambda platform=None: [])
     monkeypatch.setattr(latex_engine.shutil, "which", lambda name: None)
     lin = tiny / "bin" / "x86_64-linux"
     lin.mkdir(parents=True)
@@ -253,6 +255,10 @@ def _offline_install(monkeypatch, checksum, warnings, extracted):
             f.write("#!/bin/sh\n")
         return exe
 
+    # Unknown asset name: no pinned digest, so the installer must consult the
+    # `<url>.sha256` sibling (monkeypatched here).
+    monkeypatch.setattr(latex_engine, "TINYTEX_URLS", ["https://official.test/TinyTeX-test.tar.gz"])
+    monkeypatch.setattr(latex_engine, "TINYTEX_MIRROR_URLS", [])
     monkeypatch.setattr(latex_engine, "_download", fake_download)
     monkeypatch.setattr(
         latex_engine, "_fetch_checksum", lambda url, cancel_event=None: checksum
@@ -280,13 +286,68 @@ def test_install_tinytex_matching_checksum_installs_silently(prefs_tmp, monkeypa
     assert not os.path.exists(os.path.join(prefs.APP_DIR, "tinytex-download"))
 
 
-def test_install_tinytex_without_checksum_warns_and_continues(prefs_tmp, monkeypatch):
+def test_install_tinytex_without_checksum_aborts(prefs_tmp, monkeypatch):
     _tinytex_tmp(prefs_tmp, monkeypatch)
     warnings, extracted = [], []
-    result = _offline_install(monkeypatch, None, warnings, extracted)
+    with pytest.raises(latex_engine.LatexError) as excinfo:
+        _offline_install(monkeypatch, None, warnings, extracted)
+    assert str(excinfo.value) == messages.t("install_checksum_unavailable")
+    assert warnings == []
+    assert extracted == []
+    assert not os.path.exists(os.path.join(prefs.APP_DIR, "tinytex-download"))
+
+
+def test_install_tinytex_uses_the_pinned_digest_without_fetching(
+    prefs_tmp, monkeypatch
+):
+    """Official assets are verified against the digest compiled into the app."""
+    _tinytex_tmp(prefs_tmp, monkeypatch)
+    digest = hashlib.sha256(_FAKE_ARCHIVE).hexdigest()
+    asset = "TinyTeX-test-pinned.tar.gz"
+    monkeypatch.setattr(
+        latex_engine, "TINYTEX_URLS", ["https://official.test/" + asset]
+    )
+    monkeypatch.setattr(latex_engine, "TINYTEX_MIRROR_URLS", [])
+    monkeypatch.setattr(
+        latex_engine, "TINYTEX_SHA256_BY_ASSET", {asset: digest}
+    )
+
+    def fake_download(url, destination, progress, cancel_event=None):
+        with open(destination, "wb") as f:
+            f.write(_FAKE_ARCHIVE)
+        progress(len(_FAKE_ARCHIVE), len(_FAKE_ARCHIVE))
+
+    def fake_extract(archive_path, progress, platform=None):
+        os.makedirs(prefs.TINYTEX_DIR, exist_ok=True)
+        exe = os.path.join(prefs.TINYTEX_DIR, "pdflatex")
+        with open(exe, "w", encoding="utf-8") as f:
+            f.write("#!/bin/sh\n")
+        return exe
+
+    def no_fetch(url, cancel_event=None):
+        raise AssertionError("a pinned asset must not fetch its .sha256 sibling")
+
+    monkeypatch.setattr(latex_engine, "_download", fake_download)
+    monkeypatch.setattr(latex_engine, "_fetch_checksum", no_fetch)
+    monkeypatch.setattr(latex_engine, "_extract_archive", fake_extract)
+    monkeypatch.setattr(latex_engine, "_check", lambda path: True)
+    warnings = []
+    result = latex_engine.install_tinytex(
+        lambda done, total: None, None, warn=warnings.append
+    )
     assert result == os.path.join(prefs.TINYTEX_DIR, "pdflatex")
-    assert warnings == [messages.t("install_checksum_warning")]
-    assert len(extracted) == 1
+    assert warnings == []
+
+
+def test_pinned_digests_cover_every_official_platform_asset():
+    assert set(latex_engine.TINYTEX_SHA256_BY_ASSET) == {
+        "TinyTeX-v2026.08.zip",
+        "TinyTeX-v2026.08.tgz",
+        "TinyTeX-v2026.08.tar.gz",
+    }
+    for digest in latex_engine.TINYTEX_SHA256_BY_ASSET.values():
+        assert len(digest) == 64 and digest == digest.lower()
+        int(digest, 16)
 
 
 def test_install_tinytex_checksum_mismatch_aborts(prefs_tmp, monkeypatch):
@@ -302,7 +363,12 @@ def test_install_tinytex_checksum_mismatch_aborts(prefs_tmp, monkeypatch):
 
 def test_fetch_checksum_returns_none_when_the_asset_is_missing(monkeypatch):
     def urlopen(request, timeout=60):
-        raise urllib.error.HTTPError(request.full_url, 404, "Not Found", {}, None)
+        fp = io.BytesIO(b"")
+        error = urllib.error.HTTPError(request.full_url, 404, "Not Found", {}, fp)
+        try:
+            raise error
+        finally:
+            error.close()
 
     monkeypatch.setattr(latex_engine.urllib.request, "urlopen", urlopen)
     assert (
@@ -311,13 +377,197 @@ def test_fetch_checksum_returns_none_when_the_asset_is_missing(monkeypatch):
     )
 
 
-def test_install_checksum_warning_is_localized_in_four_languages():
+def test_install_insecure_mirror_is_localized_in_four_languages():
     texts = [
-        messages.t("install_checksum_warning", lang)
+        messages.t("install_insecure_mirror", lang)
         for lang in ("es", "en", "zh", "ru")
     ]
     assert all(isinstance(text, str) and text.strip() for text in texts)
     assert len(set(texts)) == 4
+
+
+# ---------------------------------------------------------------------------
+# Engine detection outside the app folder, mirror order and atomic installs
+# ---------------------------------------------------------------------------
+
+def test_find_pdflatex_searches_the_legacy_app_dir(prefs_tmp, monkeypatch):
+    """A TinyTeX left in the pre-rename CVLaTeX folder is still found."""
+    current = prefs_tmp / "CVLaTeX"
+    legacy = prefs_tmp / "CVLaTex"
+    monkeypatch.setattr(prefs, "APP_DIR", str(current))
+    monkeypatch.setattr(prefs, "TINYTEX_DIR", str(current / "tinytex"))
+    monkeypatch.setattr(latex_engine, "_common_engine_paths", lambda platform=None: [])
+    monkeypatch.setattr(latex_engine, "_check", lambda path: True)
+    monkeypatch.setattr(latex_engine.shutil, "which", lambda name: None)
+    exe = legacy / "tinytex" / "bin" / "x86_64-linux" / "pdflatex"
+    exe.parent.mkdir(parents=True)
+    exe.write_text("#!/bin/sh\n", encoding="utf-8")
+    assert latex_engine.find_pdflatex("linux") == str(exe)
+
+
+def test_find_pdflatex_searches_common_install_locations(prefs_tmp, monkeypatch):
+    """A manual ~/.TinyTeX or %APPDATA%\\TinyTeX install is detected."""
+    exe = prefs_tmp / "home" / ".TinyTeX" / "bin" / "x86_64-linux" / "pdflatex"
+    exe.parent.mkdir(parents=True)
+    exe.write_text("#!/bin/sh\n", encoding="utf-8")
+    monkeypatch.setattr(prefs, "TINYTEX_DIR", str(prefs_tmp / "app" / "tinytex"))
+    monkeypatch.setattr(
+        latex_engine, "_common_engine_paths", lambda platform=None: [str(exe)]
+    )
+    monkeypatch.setattr(latex_engine, "_check", lambda path: True)
+    monkeypatch.setattr(latex_engine.shutil, "which", lambda name: None)
+    assert latex_engine.find_pdflatex("linux") == str(exe)
+
+
+def test_tinytex_urls_prefer_custom_then_official_then_sourceforge(
+    prefs_tmp, monkeypatch
+):
+    monkeypatch.setattr(latex_engine, "TINYTEX_URLS", ["https://official"])
+    monkeypatch.setattr(latex_engine, "TINYTEX_MIRROR_URLS", ["https://mirror"])
+    prefs.set("tinytex_url", "https://custom")
+    assert latex_engine._tinytex_urls() == [
+        "https://custom", "https://official", "https://mirror",
+    ]
+    prefs.set("tinytex_url", "ftp://not-http")
+    assert latex_engine._tinytex_urls() == ["https://official", "https://mirror"]
+    # Plain HTTP would let a network attacker replace the archive that runs
+    # pdflatex, so it is ignored even when the user configured it.
+    prefs.set("tinytex_url", "http://insecure.example/TinyTeX.tar.gz")
+    assert latex_engine._tinytex_urls() == ["https://official", "https://mirror"]
+
+
+def test_install_from_archive_sets_latex_path(prefs_tmp, monkeypatch):
+    tiny = prefs_tmp / "tinytex"
+    monkeypatch.setattr(prefs, "TINYTEX_DIR", str(tiny))
+    monkeypatch.setattr(latex_engine, "_check", lambda path: True)
+    archive = prefs_tmp / "tinytex.tar.gz"
+    payload = b"#!/bin/sh\n"
+    with tarfile.open(archive, "w:gz") as tf:
+        info = tarfile.TarInfo(".TinyTeX/bin/x86_64-linux/pdflatex")
+        info.size = len(payload)
+        info.mode = 0o755
+        tf.addfile(info, io.BytesIO(payload))
+
+    result = latex_engine.install_from_archive(
+        str(archive), lambda done, total: None
+    )
+    assert result == str(tiny / "bin" / "x86_64-linux" / "pdflatex")
+    assert os.path.isfile(result)
+    assert prefs.get("latex_path") == result
+    assert not os.path.exists(str(tiny) + ".tmp")
+    assert not os.path.exists(str(tiny) + ".old")
+
+
+def test_extract_archive_keeps_the_previous_install_on_a_bad_archive(
+    prefs_tmp, monkeypatch
+):
+    tiny = prefs_tmp / "tinytex"
+    old = tiny / "bin" / "x86_64-linux" / "pdflatex"
+    old.parent.mkdir(parents=True)
+    old.write_text("old", encoding="utf-8")
+    monkeypatch.setattr(prefs, "TINYTEX_DIR", str(tiny))
+    archive = prefs_tmp / "broken.tar.gz"
+    with tarfile.open(archive, "w:gz") as tf:
+        info = tarfile.TarInfo("TinyTeX/README.md")
+        info.size = 4
+        tf.addfile(info, io.BytesIO(b"oops"))
+
+    with pytest.raises(latex_engine.LatexError):
+        latex_engine._extract_archive(
+            str(archive), lambda done, total: None, "linux"
+        )
+    assert old.read_text(encoding="utf-8") == "old"
+    assert not os.path.exists(str(tiny) + ".tmp")
+
+
+class _FakeDownloadResponse:
+    def __init__(self, chunks, status=206, length=3, url="https://example.test/tinytex"):
+        self._chunks = list(chunks)
+        self.status = status
+        self.headers = {"Content-Length": str(length)}
+        self._url = url
+
+    def geturl(self):
+        return self._url
+
+    def read(self, size=-1):
+        return self._chunks.pop(0) if self._chunks else b""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
+def test_download_once_refuses_an_https_to_http_redirect(prefs_tmp, monkeypatch):
+    part = prefs_tmp / "tinytex-download.part"
+
+    def fake_urlopen(request, timeout=30):
+        return _FakeDownloadResponse(
+            [b"payload"], status=200, url="http://insecure.example/tinytex"
+        )
+
+    monkeypatch.setattr(latex_engine.urllib.request, "urlopen", fake_urlopen)
+    with pytest.raises(latex_engine.DownloadError) as excinfo:
+        latex_engine._download_once(
+            "https://example.test/tinytex", str(part), lambda done, total: None
+        )
+    assert str(excinfo.value) == messages.t("install_insecure_mirror")
+    assert not part.exists()
+
+
+def test_download_once_resumes_with_a_range_request(prefs_tmp, monkeypatch):
+    part = prefs_tmp / "tinytex-download.part"
+    part.write_bytes(b"abc")
+    seen = {}
+
+    def fake_urlopen(request, timeout=30):
+        seen["range"] = request.get_header("Range")
+        return _FakeDownloadResponse([b"def"], status=206)
+
+    monkeypatch.setattr(latex_engine.urllib.request, "urlopen", fake_urlopen)
+    latex_engine._download_once(
+        "https://example.test/tinytex", str(part), lambda done, total: None
+    )
+    assert seen["range"] == "bytes=3-"
+    assert part.read_bytes() == b"abcdef"
+
+
+def test_download_once_restarts_when_the_server_ignores_range(
+    prefs_tmp, monkeypatch
+):
+    part = prefs_tmp / "tinytex-download.part"
+    part.write_bytes(b"abc")
+
+    def fake_urlopen(request, timeout=30):
+        return _FakeDownloadResponse([b"xyz"], status=200)
+
+    monkeypatch.setattr(latex_engine.urllib.request, "urlopen", fake_urlopen)
+    latex_engine._download_once(
+        "https://example.test/tinytex", str(part), lambda done, total: None
+    )
+    assert part.read_bytes() == b"xyz"
+
+
+def test_download_retries_after_a_partial_transfer(prefs_tmp, monkeypatch):
+    calls = []
+
+    def fake_once(url, part, progress, cancel_event=None):
+        calls.append(url)
+        if len(calls) == 1:
+            with open(part, "wb") as f:
+                f.write(b"abc")
+            raise latex_engine.DownloadError("transient")
+        with open(part, "ab") as f:
+            f.write(b"def")
+
+    monkeypatch.setattr(latex_engine, "_download_once", fake_once)
+    monkeypatch.setattr(latex_engine.time, "sleep", lambda seconds: None)
+    destination = prefs_tmp / "tinytex-download"
+    latex_engine._download("https://example.test/tinytex", str(destination), lambda d, t: None)
+    assert destination.read_bytes() == b"abcdef"
+    assert len(calls) == 2
 
 
 # ---------------------------------------------------------------------------

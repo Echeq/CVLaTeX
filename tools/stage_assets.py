@@ -2,7 +2,7 @@
 """Stage the public runtime assets for a PyInstaller build.
 
 Copies ``web/`` recursively, only ``templates/<dir>/*.tex`` and the optional
-window-icon ``assets/CVLaTex.ico`` / ``assets/CVLaTex.png`` into a clean
+window-icon ``assets/CVLaTeX.ico`` / ``assets/CVLaTeX.png`` into a clean
 staging directory (``build/stage`` by default), preserving the ``web/...``,
 ``templates/<dir>/...`` and ``assets/...`` layout that the frozen app expects
 inside ``sys._MEIPASS``.
@@ -45,7 +45,7 @@ class StagingError(RuntimeError):
 
 
 #: Window icons read by ``main.ICON_PATH`` / the platform launchers at runtime.
-ASSET_FILES = ("CVLaTex.ico", "CVLaTex.png")
+ASSET_FILES = ("CVLaTeX.ico", "CVLaTeX.png")
 
 
 def _is_ignored(name: str) -> bool:

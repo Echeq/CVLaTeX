@@ -1,15 +1,20 @@
+import glob
 import hashlib
+import http.client
 import os
 import platform as _platform
 import shutil
+import socket
 import subprocess
 import sys
 import tarfile
 import threading
+import time
 import urllib.error
 import urllib.request
 import uuid
 import zipfile
+from urllib.parse import urlsplit
 
 import messages
 import prefs
@@ -69,6 +74,41 @@ TINYTEX_URLS_BY_PLATFORM = {
 TINYTEX_URLS = list(
     TINYTEX_URLS_BY_PLATFORM.get(sys.platform, TINYTEX_URLS_BY_PLATFORM["linux"])
 )
+# SourceForge mirrors the same releases and is usually reachable when GitHub
+# is slow or blocked (notably from mainland China). It is tried only after the
+# official asset and is verified against the same pinned SHA-256 digest.
+_SOURCEFORGE_MIRROR = (
+    "https://downloads.sourceforge.net/project/tinytex-releases.mirror/v%s"
+    % TINYTEX_VERSION
+)
+TINYTEX_MIRROR_URLS_BY_PLATFORM = {
+    "win32": [f"{_SOURCEFORGE_MIRROR}/TinyTeX-v{TINYTEX_VERSION}.zip"],
+    "darwin": [f"{_SOURCEFORGE_MIRROR}/TinyTeX-v{TINYTEX_VERSION}.tgz"],
+    "linux": [f"{_SOURCEFORGE_MIRROR}/TinyTeX-v{TINYTEX_VERSION}.tar.gz"],
+}
+TINYTEX_MIRROR_URLS = list(
+    TINYTEX_MIRROR_URLS_BY_PLATFORM.get(
+        sys.platform, TINYTEX_MIRROR_URLS_BY_PLATFORM["linux"]
+    )
+)
+# SHA-256 of the exact assets published for TINYTEX_VERSION (GitHub API
+# `digest` field). Pinning them means the installer does not trust a checksum
+# served next to the archive: a compromised or truncated download always
+# aborts, and the official/SourceForge assets never need a second request.
+TINYTEX_SHA256_BY_ASSET = {
+    f"TinyTeX-v{TINYTEX_VERSION}.zip": (
+        "313314cdf15ad94e78931f6eff9bfc978f233ece7e5877f26467afe0b40f377b"
+    ),
+    f"TinyTeX-v{TINYTEX_VERSION}.tgz": (
+        "c1e6ee0474300c72395647aa93aca0ea4bb600192e9a22bf539d57a583acb5c5"
+    ),
+    f"TinyTeX-v{TINYTEX_VERSION}.tar.gz": (
+        "6f39005ce5c60863698793481352df75c051980b68a47726d49be9a00a377767"
+    ),
+}
+TINYTEX_RELEASES_PAGE = (
+    "https://github.com/rstudio/tinytex-releases/releases/tag/v%s" % TINYTEX_VERSION
+)
 ALLOWED_PHOTOS = {".jpg", ".jpeg", ".png"}
 _LOCK = threading.Lock()
 _SUBPROCESS_FLAGS = 0x08000000 if os.name == "nt" else 0  # CREATE_NO_WINDOW: no console window
@@ -76,6 +116,10 @@ _SUBPROCESS_FLAGS = 0x08000000 if os.name == "nt" else 0  # CREATE_NO_WINDOW: no
 
 class LatexError(Exception):
     pass
+
+
+class DownloadError(LatexError):
+    """Transient network failure; the installer may try the next mirror."""
 
 
 def _check(path):
@@ -91,19 +135,137 @@ def _check(path):
         return False
 
 
-def find_pdflatex(platform=None):
+def _common_engine_paths(platform=None):
+    """pdflatex paths of the usual manual TinyTeX/TeX Live/MiKTeX installs.
+
+    GUI applications do not always inherit the shell PATH, especially on macOS
+    and Windows, and a user may have installed TinyTeX outside the app's own
+    data directory. These are the documented/default locations.
+    """
     platform = sys.platform if platform is None else platform
-    path = prefs.get("latex_path")
-    if path and os.path.isfile(path) and _check(path):
-        return path
-    for relative in _tinyttex_bin_dirs(platform):
-        bundled = _engine_path(prefs.TINYTEX_DIR, relative, "pdflatex", platform)
-        if os.path.isfile(bundled) and _check(bundled):
-            return bundled
-    found = shutil.which("pdflatex")
-    if found:
-        return found
+    home = os.path.expanduser("~")
+    exe = _engine_exe("pdflatex", platform)
+    if platform == "win32":
+        appdata = os.environ.get("APPDATA")
+        localappdata = os.environ.get("LOCALAPPDATA")
+        if appdata:
+            yield os.path.join(appdata, "TinyTeX", "bin", "windows", exe)
+        if localappdata:
+            yield os.path.join(localappdata, "TinyTeX", "bin", "windows", exe)
+            yield os.path.join(
+                localappdata, "Programs", "TinyTeX", "bin", "windows", exe
+            )
+            yield from glob.glob(
+                os.path.join(
+                    localappdata, "Programs", "MiKTeX", "miktex", "bin", "*", exe
+                )
+            )
+        yield os.path.join("C:\\", "TinyTeX", "bin", "windows", exe)
+        yield os.path.join(
+            "C:\\", "Program Files", "MiKTeX", "miktex", "bin", "x64", exe
+        )
+        yield from glob.glob(os.path.join("C:\\", "texlive", "*", "bin", "windows", exe))
+    elif platform == "darwin":
+        yield os.path.join(
+            home, "Library", "TinyTeX", "bin", "universal-darwin", exe
+        )
+        yield os.path.join(
+            home, "Library", "TinyTeX", "TinyTeX", "bin", "universal-darwin", exe
+        )
+        yield os.path.join("/Library", "TeX", "texbin", exe)
+        yield os.path.join("/opt", "local", "bin", exe)
+        yield os.path.join("/usr", "local", "bin", exe)
+        yield from glob.glob(
+            os.path.join("/usr", "local", "texlive", "*", "bin", "universal-darwin", exe)
+        )
+    else:
+        yield os.path.join(home, ".TinyTeX", "bin", "x86_64-linux", exe)
+        yield os.path.join(home, ".TinyTeX", "bin", "aarch64-linux", exe)
+        yield os.path.join(home, "TinyTeX", "bin", "x86_64-linux", exe)
+        yield from glob.glob(os.path.join(home, ".TinyTeX", "bin", "*", exe))
+        yield os.path.join("/usr", "bin", exe)
+        yield os.path.join("/usr", "local", "bin", exe)
+        yield from glob.glob(os.path.join("/usr", "local", "texlive", "*", "bin", "*", exe))
+        yield from glob.glob(os.path.join("/opt", "texlive", "*", "bin", "*", exe))
+
+
+def _default_engine_roots():
+    """Default app dirs, for a TinyTeX left behind by a redirected APP_DIR."""
+    default = prefs.default_app_dir()
+    current = os.path.abspath(default)
+    legacy = os.path.join(os.path.dirname(current), prefs.LEGACY_APP_NAME)
+    return [os.path.join(current, "tinytex"), os.path.join(legacy, "tinytex")]
+
+
+def _candidate_paths(platform=None):
+    """Every pdflatex candidate, best first, without duplicates."""
+    platform = sys.platform if platform is None else platform
+    seen = set()
+
+    def emit(path):
+        if not path:
+            return
+        key = os.path.normcase(os.path.abspath(path))
+        if key in seen:
+            return
+        seen.add(key)
+        yield path
+
+    preferred = prefs.get("latex_path")
+    if preferred:
+        yield from emit(preferred)
+    for root in (prefs.TINYTEX_DIR, os.path.join(prefs.legacy_app_dir(), "tinytex")):
+        for relative in _tinyttex_bin_dirs(platform):
+            yield from emit(_engine_path(root, relative, "pdflatex", platform))
+    for path in _common_engine_paths(platform):
+        yield from emit(path)
+    for root in _default_engine_roots():
+        for relative in _tinyttex_bin_dirs(platform):
+            yield from emit(_engine_path(root, relative, "pdflatex", platform))
+    for name in ("pdflatex", "pdflatex.exe"):
+        found = shutil.which(name)
+        if found:
+            yield from emit(found)
+
+
+_LAST_ENGINE = None
+
+
+def reset_engine_cache():
+    """Forget the resolved engine after a path change or a new install."""
+    global _LAST_ENGINE
+    _LAST_ENGINE = None
+
+
+def find_pdflatex(platform=None):
+    """Resolve pdflatex once; explicit-platform calls are for tests/diagnostics."""
+    global _LAST_ENGINE
+    if platform is None and _LAST_ENGINE:
+        if os.path.isfile(_LAST_ENGINE) and _check(_LAST_ENGINE):
+            return _LAST_ENGINE
+        _LAST_ENGINE = None
+    for path in _candidate_paths(platform):
+        if os.path.isfile(path) and _check(path):
+            if platform is None:
+                _LAST_ENGINE = path
+            return path
     return None
+
+
+def pdflatex_diagnostics(platform=None):
+    """Paths checked when detection fails; never runs the engine."""
+    platform = sys.platform if platform is None else platform
+    candidates = []
+    for path in _candidate_paths(platform):
+        candidates.append({"path": path, "exists": os.path.isfile(path)})
+    return {
+        "platform": platform,
+        "prefs_path": prefs.get("latex_path"),
+        "tinytex_dir": prefs.TINYTEX_DIR,
+        "legacy_tinytex_dir": os.path.join(prefs.legacy_app_dir(), "tinytex"),
+        "which": shutil.which("pdflatex"),
+        "candidates": candidates[:30],
+    }
 
 
 def _raise_if_cancelled(cancel_event):
@@ -112,24 +274,137 @@ def _raise_if_cancelled(cancel_event):
         raise LatexError(messages.t("install_cancelled"))
 
 
-def _download(url, destination, progress, cancel_event=None):
-    request = urllib.request.Request(url, headers={"User-Agent": "CVLaTex/1.0"})
+def _tinytex_urls():
+    """Download order: custom mirror, official asset, SourceForge fallback.
+
+    Only HTTPS mirrors are accepted: the archive ends up executing `pdflatex`,
+    so a plain-HTTP URL is ignored instead of silently downgrading transport.
+    """
+    urls = []
+    custom = str(prefs.get("tinytex_url") or "").strip()
+    if custom.lower().startswith("https://"):
+        urls.append(custom)
+    urls.extend(TINYTEX_URLS)
+    urls.extend(TINYTEX_MIRROR_URLS)
+    seen = set()
+    ordered = []
+    for url in urls:
+        if url not in seen:
+            seen.add(url)
+            ordered.append(url)
+    return ordered
+
+
+def _pinned_checksum(url):
+    """Pinned SHA-256 for an official/mirror asset name, or None.
+
+    The asset file name is the key, so a custom mirror that serves the same
+    release file is verified against the same published digest.
+    """
+    name = str(url or "").split("?", 1)[0].rsplit("/", 1)[-1]
+    return TINYTEX_SHA256_BY_ASSET.get(name)
+
+
+def _download_once(url, part, progress, cancel_event=None):
+    """One HTTP attempt; resumes from ``part`` with a Range request."""
+    existing = os.path.getsize(part) if os.path.isfile(part) else 0
+    headers = {"User-Agent": "CVLaTeX/1.0"}
+    if existing:
+        headers["Range"] = "bytes=%d-" % existing
+    request = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(request, timeout=60) as response, open(destination, "wb") as f:
-            total = int(response.headers.get("Content-Length") or 0)
-            done = 0
-            while True:
-                _raise_if_cancelled(cancel_event)
-                chunk = response.read(1024 * 256)
-                if not chunk:
-                    break
-                f.write(chunk)
-                done += len(chunk)
+        with urllib.request.urlopen(request, timeout=30) as response:
+            # A HTTPS URL can still redirect to plain HTTP. The archive runs
+            # pdflatex later, so refuse the downgrade instead of downloading it.
+            if urlsplit(response.geturl() or url).scheme.lower() != "https":
+                raise DownloadError(messages.t("install_insecure_mirror"))
+            status = getattr(response, "status", 200)
+            if existing and status != 206:
+                # The server ignored the Range header: start over.
+                existing = 0
+            total = existing + int(response.headers.get("Content-Length") or 0)
+            if total and existing >= total:
+                return
+            done = existing
+            if total:
                 progress(done, total)
-    except (urllib.error.URLError, OSError) as e:
-        raise LatexError(messages.t("install_download_error").format(error=e)) from e
-    except KeyError as e:
-        raise LatexError(messages.t("install_connection_error")) from e
+            mode = "ab" if existing else "wb"
+            with open(part, mode) as f:
+                while True:
+                    _raise_if_cancelled(cancel_event)
+                    chunk = response.read(256 * 1024)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    f.flush()
+                    done += len(chunk)
+                    progress(done, total or None)
+            if total and done < total:
+                raise DownloadError(messages.t("install_connection_error"))
+    except DownloadError:
+        raise
+    except urllib.error.HTTPError as e:
+        if e.code == 416 and existing:
+            try:
+                os.remove(part)
+            except OSError:
+                pass
+            raise DownloadError(messages.t("install_connection_error")) from e
+        raise DownloadError(messages.t("install_download_error").format(error=e)) from e
+    except (
+        urllib.error.URLError,
+        http.client.HTTPException,
+        socket.timeout,
+        TimeoutError,
+        ConnectionError,
+        OSError,
+    ) as e:
+        raise DownloadError(messages.t("install_download_error").format(error=e)) from e
+
+
+def _download(url, destination, progress, cancel_event=None, attempts=2):
+    """Download with resume, URL marker and bounded retries.
+
+    A partial file survives a network failure so a retry (or a later run) can
+    continue with ``Range``. The marker prevents resuming a partial file from a
+    different mirror.
+    """
+    part = destination + ".part"
+    marker = destination + ".url"
+    try:
+        with open(marker, "r", encoding="utf-8") as f:
+            previous = f.read().strip()
+    except OSError:
+        previous = ""
+    if previous and previous != url:
+        for path in (part, marker):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+    try:
+        os.makedirs(os.path.dirname(destination) or ".", exist_ok=True)
+        with open(marker, "w", encoding="utf-8") as f:
+            f.write(url)
+    except OSError:
+        pass
+
+    last_error = None
+    for attempt in range(1, attempts + 1):
+        try:
+            _download_once(url, part, progress, cancel_event)
+            os.replace(part, destination)
+            try:
+                os.remove(marker)
+            except OSError:
+                pass
+            return
+        except DownloadError as e:
+            last_error = e
+            _raise_if_cancelled(cancel_event)
+            if attempt < attempts:
+                time.sleep(min(2 ** attempt, 8))
+    raise last_error or DownloadError(messages.t("install_connection_error"))
 
 
 def _sha256_file(path):
@@ -172,7 +447,7 @@ def _fetch_checksum(url, cancel_event=None):
     can continue the install with a warning instead of aborting. A cancelled
     install still raises the localized LatexError.
     """
-    request = urllib.request.Request(url, headers={"User-Agent": "CVLaTex/1.0"})
+    request = urllib.request.Request(url, headers={"User-Agent": "CVLaTeX/1.0"})
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
             text = response.read().decode("utf-8", errors="replace")
@@ -224,34 +499,76 @@ def _find_extracted_pdflatex(root, platform):
 
 
 def _extract_archive(archive_path, progress, platform=None):
+    """Extract and validate into a staging dir, then swap atomically.
+
+    The previous installation is only moved aside after the new tree contains
+    a usable pdflatex. A corrupt archive therefore leaves the old TinyTeX
+    untouched, and a failed swap restores it.
+    """
     platform = sys.platform if platform is None else platform
     staging = prefs.TINYTEX_DIR + ".tmp"
+    previous = prefs.TINYTEX_DIR + ".old"
     if os.path.exists(staging):
         shutil.rmtree(staging, ignore_errors=True)
-    if os.path.exists(prefs.TINYTEX_DIR):
-        shutil.rmtree(prefs.TINYTEX_DIR, ignore_errors=True)
     os.makedirs(staging)
-    if _archive_kind(platform) == "zip":
-        _extract_zip(archive_path, staging, progress)
-    else:
-        _extract_tar(archive_path, staging, progress)
-    directories = [
-        d
-        for d in os.listdir(staging)
-        if os.path.isdir(os.path.join(staging, d))
-    ]
-    root = staging
-    if len(directories) == 1:
-        root = os.path.join(staging, directories[0])
-    relative = _find_extracted_pdflatex(root, platform)
-    if relative is None:
+    try:
+        # Manual installs may choose either archive format regardless of OS.
+        if zipfile.is_zipfile(archive_path):
+            _extract_zip(archive_path, staging, progress)
+        else:
+            _extract_tar(archive_path, staging, progress)
+        directories = [
+            d
+            for d in os.listdir(staging)
+            if os.path.isdir(os.path.join(staging, d))
+        ]
+        root = staging
+        if len(directories) == 1:
+            root = os.path.join(staging, directories[0])
+        relative = _find_extracted_pdflatex(root, platform)
+        if relative is None:
+            raise LatexError(messages.t("install_invalid_zip"))
+
+        if os.path.exists(previous):
+            if os.path.isdir(previous):
+                shutil.rmtree(previous)
+            else:
+                os.remove(previous)
+        if os.path.exists(prefs.TINYTEX_DIR):
+            shutil.move(prefs.TINYTEX_DIR, previous)
+        try:
+            os.makedirs(prefs.TINYTEX_DIR)
+            for name in os.listdir(root):
+                shutil.move(os.path.join(root, name), prefs.TINYTEX_DIR)
+        except OSError:
+            shutil.rmtree(prefs.TINYTEX_DIR, ignore_errors=True)
+            if os.path.exists(previous):
+                shutil.move(previous, prefs.TINYTEX_DIR)
+            raise
+        shutil.rmtree(previous, ignore_errors=True)
+    except LatexError:
         shutil.rmtree(staging, ignore_errors=True)
-        raise LatexError(messages.t("install_invalid_zip"))
-    os.makedirs(prefs.TINYTEX_DIR)
-    for name in os.listdir(root):
-        shutil.move(os.path.join(root, name), prefs.TINYTEX_DIR)
-    shutil.rmtree(staging, ignore_errors=True)
+        raise
+    except (zipfile.BadZipFile, tarfile.TarError, EOFError, OSError) as e:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise LatexError(messages.t("install_unzip_error").format(error=e)) from e
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
     return _engine_path(prefs.TINYTEX_DIR, relative, "pdflatex", platform)
+
+
+def install_from_archive(archive_path, progress, cancel_event=None, warn=None):
+    """Install TinyTeX from a local .zip/.tar.gz/.tgz/.tar.xz archive."""
+    _raise_if_cancelled(cancel_event)
+    if not archive_path or not os.path.isfile(archive_path):
+        raise LatexError(messages.t("install_archive_missing"))
+    pdflatex = _extract_archive(archive_path, progress)
+    _raise_if_cancelled(cancel_event)
+    if not pdflatex or not _check(pdflatex):
+        raise LatexError(messages.t("install_broken"))
+    prefs.set("latex_path", pdflatex)
+    reset_engine_cache()
+    return pdflatex
 
 
 def install_tinytex(progress, cancel_event=None, warn=None):
@@ -262,42 +579,56 @@ def install_tinytex(progress, cancel_event=None, warn=None):
     extraction. Aborting raises LatexError with a localized message.
 
     ``warn(message)`` (optional) receives localized warnings that do not stop
-    the install. SHA-256 policy: when the release publishes `<url>.sha256` and
-    it matches, the install continues silently; when the checksum asset is
-    unavailable (the tinytex-releases v2026.08 assets have no `.sha256`), the
-    install continues after ``warn``; an available checksum that mismatches
-    always aborts with LatexError.
+    the install. SHA-256 policy: official and SourceForge assets are verified
+    against digests pinned in ``TINYTEX_SHA256_BY_ASSET``; a custom mirror must
+    publish ``<url>.sha256``. A missing checksum aborts the install, and a
+    mismatch always aborts. Only HTTPS mirrors are used.
     """
     _raise_if_cancelled(cancel_event)
+    custom = str(prefs.get("tinytex_url") or "").strip()
+    if custom and not custom.lower().startswith("https://") and warn is not None:
+        warn(messages.t("install_insecure_mirror"))
     os.makedirs(prefs.APP_DIR, exist_ok=True)
     tmp = os.path.join(prefs.APP_DIR, "tinytex-download")
-    pdflatex = None
+    last_download_error = None
+    success = False
     try:
-        for url in TINYTEX_URLS:
+        for url in _tinytex_urls():
             progress(0, None)
-            _download(url, tmp, progress, cancel_event)
-            _raise_if_cancelled(cancel_event)
-            checksum = _fetch_checksum(url + ".sha256", cancel_event)
-            if checksum is None:
-                if warn is not None:
-                    warn(messages.t("install_checksum_warning"))
-            else:
-                verify_sha256(tmp, checksum)
             try:
-                pdflatex = _extract_archive(tmp, progress)
-                break
-            except (zipfile.BadZipFile, tarfile.TarError, EOFError, OSError) as e:
-                raise LatexError(messages.t("install_unzip_error").format(error=e)) from e
+                _download(url, tmp, progress, cancel_event)
+            except DownloadError as e:
+                # Slow/blocked host: keep the partial file for a resume and
+                # try the next source (custom mirror, GitHub, SourceForge).
+                last_download_error = e
+                continue
+            _raise_if_cancelled(cancel_event)
+            try:
+                expected = _pinned_checksum(url)
+                if expected is None:
+                    expected = _fetch_checksum(url + ".sha256", cancel_event)
+                if expected is None:
+                    raise LatexError(messages.t("install_checksum_unavailable"))
+                verify_sha256(tmp, expected)
+                pdflatex = install_from_archive(tmp, progress, cancel_event, warn)
+            except LatexError:
+                # A bad archive/checksum must not be retried from another URL.
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+                raise
+            success = True
+            return pdflatex
+        raise last_download_error or DownloadError(
+            messages.t("install_connection_error")
+        )
     finally:
-        if os.path.exists(tmp):
+        if success and os.path.exists(tmp):
             try:
                 os.remove(tmp)
             except OSError:
                 pass
-    if not pdflatex or not _check(pdflatex):
-        raise LatexError(messages.t("install_broken"))
-    prefs.set("latex_path", pdflatex)
-    return pdflatex
 
 
 def _read_log(path):

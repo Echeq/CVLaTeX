@@ -180,7 +180,7 @@ def test_release_workflow_publishes_idempotently():
     assert "--clobber" in workflow
     assert "gh release edit" in workflow
     assert "--generate-notes" in workflow
-    assert "--prerelease" in workflow
+    assert "--prerelease" not in workflow
 
 
 def test_release_workflow_tests_and_builds_three_platforms():
@@ -207,15 +207,15 @@ def test_release_workflow_generates_checksums_and_versioned_archives():
     assert "sha256sum" in workflow
     assert "SHA256SUMS.txt" in workflow
     for asset in (
-        "CVLaTex-v${VERSION}-windows-x64.zip",
-        "CVLaTex-v${VERSION}-linux-x86_64.tar.gz",
-        "CVLaTex-v${VERSION}-macos-arm64.zip",
+        "CVLaTeX-v${VERSION}-windows-x64.zip",
+        "CVLaTeX-v${VERSION}-linux-x86_64.tar.gz",
+        "CVLaTeX-v${VERSION}-macos-arm64.zip",
     ):
         assert asset in workflow, asset
     # Every published archive is inspected before the release is created.
     for entry in (
-        "CVLaTex.exe",
-        "CVLaTex.app/",
+        "CVLaTeX.exe",
+        "CVLaTeX.app/",
         "README.md",
         "LICENSE",
         "THIRD_PARTY_NOTICES.md",
@@ -248,9 +248,9 @@ def test_build_workflow_builds_and_uploads_versioned_archives():
     for script in ("build.bat", "PYTHON=/usr/bin/python3 ./build.sh", "./build.sh"):
         assert script in workflow, script
     for path in (
-        "dist/CVLaTex-v*-windows-x64.zip",
-        "dist/CVLaTex-v*-linux-x86_64.tar.gz",
-        "dist/CVLaTex-v*-macos-arm64.zip",
+        "dist/CVLaTeX-v*-windows-x64.zip",
+        "dist/CVLaTeX-v*-linux-x86_64.tar.gz",
+        "dist/CVLaTeX-v*-macos-arm64.zip",
     ):
         assert path in workflow, path
     assert "actions/upload-artifact@v4" in workflow
@@ -262,13 +262,13 @@ def test_readme_documents_release_assets():
     assert "## Download" in readme
     assert "## Releases" in readme
     assert "## Installation" in readme
-    assert "v%s is the latest public pre-release" % VERSION in readme
+    assert "v%s is the first stable release" % VERSION in readme
 
     base = "https://github.com/Echeq/CVLaTex/releases/download/v%s/" % VERSION
     for asset in (
-        "CVLaTex-v%s-windows-x64.zip" % VERSION,
-        "CVLaTex-v%s-macos-arm64.zip" % VERSION,
-        "CVLaTex-v%s-linux-x86_64.tar.gz" % VERSION,
+        "CVLaTeX-v%s-windows-x64.zip" % VERSION,
+        "CVLaTeX-v%s-macos-arm64.zip" % VERSION,
+        "CVLaTeX-v%s-linux-x86_64.tar.gz" % VERSION,
         "SHA256SUMS.txt",
     ):
         assert asset in readme, asset
@@ -284,9 +284,9 @@ def test_readme_documents_release_assets():
         "Intel Macs are not supported",
         "sudo apt install python3-gi gir1.2-webkit2-4.1",
         "sudo pacman -S python-gobject webkit2gtk-4.1",
-        "tar -xzf CVLaTex-v%s-linux-x86_64.tar.gz" % VERSION,
-        "chmod +x CVLaTex",
-        "./CVLaTex",
+        "tar -xzf CVLaTeX-v%s-linux-x86_64.tar.gz" % VERSION,
+        "chmod +x CVLaTeX",
+        "./CVLaTeX",
         "libwebkit2gtk-4.1-dev",
         "language picker",
         "blank CV",
@@ -376,25 +376,25 @@ def test_stage_assets_copies_public_assets_only(tmp_path):
 
     # The window icon is read from BASE_DIR/assets at runtime, so the frozen
     # bundle needs it staged next to web/ and templates/.
-    assert (destination / "assets" / "CVLaTex.ico").is_file()
-    assert (destination / "assets" / "CVLaTex.png").is_file()
+    assert (destination / "assets" / "CVLaTeX.ico").is_file()
+    assert (destination / "assets" / "CVLaTeX.png").is_file()
 
 
 def test_package_release_windows_archive(tmp_path):
     package_release = _load_tool("package_release", PACKAGE_TOOL)
     docs = tmp_path / "docs"
     _write_docs(str(docs))
-    binary = tmp_path / "CVLaTex.exe"
+    binary = tmp_path / "CVLaTeX.exe"
     binary.write_bytes(b"dummy windows binary")
     output = tmp_path / "dist"
 
     archive = package_release.package(
         "windows", str(binary), str(output), str(docs), version=VERSION
     )
-    assert os.path.basename(archive) == "CVLaTex-v%s-windows-x64.zip" % VERSION
+    assert os.path.basename(archive) == "CVLaTeX-v%s-windows-x64.zip" % VERSION
     with zipfile.ZipFile(archive) as zf:
         names = set(zf.namelist())
-    assert "CVLaTex.exe" in names
+    assert "CVLaTeX.exe" in names
     for doc in ("README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "CHANGELOG.md", "SECURITY.md"):
         assert doc in names, doc
 
@@ -403,18 +403,18 @@ def test_package_release_linux_archive_preserves_executable_bit(tmp_path):
     package_release = _load_tool("package_release", PACKAGE_TOOL)
     docs = tmp_path / "docs"
     _write_docs(str(docs))
-    binary = tmp_path / "CVLaTex"
-    binary.write_bytes(b"#!/bin/sh\necho CVLaTex\n")
+    binary = tmp_path / "CVLaTeX"
+    binary.write_bytes(b"#!/bin/sh\necho CVLaTeX\n")
     binary.chmod(0o755)
     output = tmp_path / "dist"
 
     archive = package_release.package(
         "linux", str(binary), str(output), str(docs), version=VERSION
     )
-    assert os.path.basename(archive) == "CVLaTex-v%s-linux-x86_64.tar.gz" % VERSION
+    assert os.path.basename(archive) == "CVLaTeX-v%s-linux-x86_64.tar.gz" % VERSION
     with tarfile.open(archive, "r:gz") as tf:
         names = set(tf.getnames())
-        member = tf.getmember("CVLaTex")
+        member = tf.getmember("CVLaTeX")
         assert member.mode & stat.S_IXUSR
     for doc in ("README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "CHANGELOG.md", "SECURITY.md"):
         assert doc in names, doc
@@ -424,26 +424,26 @@ def test_package_release_macos_archive_keeps_app_bundle(tmp_path):
     package_release = _load_tool("package_release", PACKAGE_TOOL)
     docs = tmp_path / "docs"
     _write_docs(str(docs))
-    app = tmp_path / "CVLaTex.app" / "Contents" / "MacOS"
+    app = tmp_path / "CVLaTeX.app" / "Contents" / "MacOS"
     app.mkdir(parents=True)
-    executable = app / "CVLaTex"
+    executable = app / "CVLaTeX"
     executable.write_bytes(b"dummy macos binary")
     executable.chmod(0o755)
     output = tmp_path / "dist"
 
     archive = package_release.package(
         "macos",
-        str(tmp_path / "CVLaTex.app"),
+        str(tmp_path / "CVLaTeX.app"),
         str(output),
         str(docs),
         version=VERSION,
         arch="arm64",
     )
-    assert os.path.basename(archive) == "CVLaTex-v%s-macos-arm64.zip" % VERSION
+    assert os.path.basename(archive) == "CVLaTeX-v%s-macos-arm64.zip" % VERSION
     with zipfile.ZipFile(archive) as zf:
         names = set(zf.namelist())
-    assert any(name == "CVLaTex.app/" or name.startswith("CVLaTex.app/") for name in names)
-    assert "CVLaTex.app/Contents/MacOS/CVLaTex" in names
+    assert any(name == "CVLaTeX.app/" or name.startswith("CVLaTeX.app/") for name in names)
+    assert "CVLaTeX.app/Contents/MacOS/CVLaTeX" in names
     for doc in ("README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "CHANGELOG.md", "SECURITY.md"):
         assert doc in names, doc
 
@@ -452,8 +452,8 @@ def test_windows_version_resource_uses_version_py():
     windows_version = _load_tool("windows_version", WINDOWS_VERSION_TOOL)
     text = windows_version.render(VERSION)
     numeric = ".".join(str(part) for part in windows_version.numeric_version(VERSION))
-    assert "ProductName', 'CVLaTex'" in text
-    assert "FileDescription', 'CVLaTex'" in text
+    assert "ProductName', 'CVLaTeX'" in text
+    assert "FileDescription', 'CVLaTeX'" in text
     assert "CompanyName" in text
     assert "FileVersion', '%s'" % numeric in text
     assert "ProductVersion', '%s'" % numeric in text

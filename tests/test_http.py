@@ -140,11 +140,39 @@ def test_security_headers_on_success_and_error(server):
         assert resp.getheader("X-Content-Type-Options") == "nosniff"
         assert resp.getheader("Referrer-Policy") == "no-referrer"
         assert resp.getheader("Cache-Control") == "no-store"
+        assert resp.getheader("Content-Security-Policy")
     status, resp, _ = _request(port, "/?token=" + token)
     assert status == 200
     assert resp.getheader("X-Content-Type-Options") == "nosniff"
     assert resp.getheader("Referrer-Policy") == "no-referrer"
     assert resp.getheader("Cache-Control") == "no-store"
+
+
+def test_content_security_policy_is_scoped_per_route(server):
+    port, token = server
+    status, resp, _ = _request(port, "/", token=token)
+    assert status == 200
+    app_csp = resp.getheader("Content-Security-Policy")
+    assert "default-src 'none'" in app_csp
+    assert "script-src 'self' 'unsafe-eval'" in app_csp
+    assert "frame-ancestors 'none'" in app_csp
+    assert resp.getheader("X-Frame-Options") == "DENY"
+    assert "camera=()" in resp.getheader("Permissions-Policy")
+    assert resp.getheader("Cross-Origin-Resource-Policy") == "same-origin"
+
+    status, resp, _ = _request(port, "/pdfjs/viewer.html", cookie=token)
+    assert status == 200
+    pdfjs_csp = resp.getheader("Content-Security-Policy")
+    assert "script-src 'self' 'unsafe-inline'" in pdfjs_csp
+    assert "worker-src 'self' blob:" in pdfjs_csp
+    assert "frame-ancestors 'self'" in pdfjs_csp
+    assert resp.getheader("X-Frame-Options") == "SAMEORIGIN"
+
+    status, resp, _ = _request(port, "/preview/result.pdf", cookie=token)
+    assert status == 200
+    preview_csp = resp.getheader("Content-Security-Policy")
+    assert "frame-ancestors 'self'" in preview_csp
+    assert resp.getheader("X-Frame-Options") == "SAMEORIGIN"
 
 
 def test_host_header_must_be_exact_loopback_authority(server):

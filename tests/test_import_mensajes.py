@@ -23,11 +23,11 @@ MSG_PLANTILLA_AJENA = (
     "Se recomienda buscar otra plantilla."
 )
 MSG_SIN_BLOQUE = (
-    "Este .tex fue generado por una versión anterior de CVLaTex sin datos incrustados: "
+    "Este .tex fue generado por una versión anterior de CVLaTeX sin datos incrustados: "
     "no se puede reimportar. Vuelve a generarlo con la versión actual."
 )
 MSG_BLOQUE_DANADO = (
-    "El bloque de datos de CVLaTex está dañado y no se puede reimportar."
+    "El bloque de datos de CVLaTeX está dañado y no se puede reimportar."
 )
 
 

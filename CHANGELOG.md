@@ -1,9 +1,132 @@
 # Changelog
 
-All notable changes to CVLaTex are documented in this file.
+All notable changes to CVLaTeX are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [1.0.0] - 2026-11-22
+
+### Added
+
+- Typography preferences: Serif/Sans/Monospace font style and 9/10/11/12/14 pt
+  sizes in Settings. Both apply to the PDF, the Word export and the exported
+  `.tex`; sizes outside 10/11/12 pt use `scrextend` when available and fall
+  back to the nearest standard size.
+- A **45-second demo video** (`docs/media/videos/demo-en.mp4`) and its poster
+  image, linked from the README and the competition package.
+- Market CV guides for the United States, United Kingdom, Spain, Latin
+  America, China and Russia, with sources and image/video placeholders.
+- Competition package (`docs/competition/`) and media conventions
+  (`docs/media/`), plus six market summaries in `Help → Dedicated to each
+  market`.
+- A credits line that states the app is for students, recent graduates and
+  professionals, with or without a university degree.
+- `Add → Optional sections` can create the Social networks and Extra details
+  cards on demand. A new CV no longer shows those empty cards by default; a
+  hint points to Add and the sample CV. Saved CVs that use them keep them.
+- `Add → CV sections` creates Profile, Education, Work, Internships, Projects,
+  Campus activities, Skills, Languages and References. A new CV starts with
+  Personal details only; empty sections stay hidden until added or filled.
+- Added sections get an empty editable entry and focus their first field.
+  Clicking a list/custom block row opens its editor directly; new blocks are
+  scrolled into view, so the Edit button is no longer required.
+- Section headers now include a confirmed **remove** action that clears the
+  section content and hides it until it is added again.
+- The Add menu is reorganized around the user's task: **Sections** first
+  (including custom sections and list blocks), **Extras**, **Separators** and
+  **Manage custom content**. The form's Custom content card is hidden until a
+  block exists.
+- The left form now switches to one field per row when the panel is narrow,
+  gives the school-logo field the full row, groups the photo width/height
+  controls, and uses a compact media card. Section spacing and labels were
+  tightened so the panel reads as one column instead of a cramped grid.
+- The school logo is now an optional letterhead mark above the name, with a
+  selectable **left or right corner** and an adjustable **size in centimetres**
+  (clamped to the media column/bar). A right-corner logo shares the reserved
+  media column with the photo, so the name/contact text on the left keeps its
+  position instead of being pushed by the logo. Choosing it opens a crop editor
+  with a locked wide area (2:1, 3:1 or 4:1, default 3:1), so a long
+  institutional logo stays long; the crop can be reopened with `Adjust area…`
+  and the original image is kept in the project.
+- The photo and the logo now start at the top margin, level with the name, and
+  keep a clear vertical gap instead of leaving a blank strip above the image.
+- **Harvard** is intentionally photo-free; the form hides the photo controls
+  for that template and the PDF/Word exports ignore a saved photo.
+- `Settings → Measurement units` switches the photo width/height fields between
+  centimetres and inches while the document keeps using centimetres internally.
+  The crop editor also offers photo shapes (Free, 1:1, 4:5, 3:4).
+- The sample CV now uses the project's public identity (Elvis Enrique Chen Qiu
+  / 陈昌发, HUST Software Engineering, GitHub/LinkedIn `ECHEQ`,
+  `echeq@github.com`, fake phone `123-456-78`) and includes a free separator
+  block.
+- LaTeX engine diagnostics, a manual TinyTeX download/install-from-file path
+  and an optional trusted download mirror.
+- Security hardening for local data: CSP, `X-Frame-Options`,
+  `Permissions-Policy` and `Cross-Origin-Resource-Policy` headers on the
+  loopback server; 12 MB image and 50 MB `.cvjson` limits; PNG/JPEG magic-byte
+  validation; and bounded embedded media (12 MB each, 64 MB total).
+- TinyTeX downloads now verify official assets against SHA-256 digests pinned
+  in the source, require `<url>.sha256` for custom mirrors and accept only
+  HTTPS mirrors (including refusing HTTPS-to-HTTP redirects); a missing
+  checksum aborts instead of warning.
+
+### Changed
+
+- The visible product name is back to **CVLaTeX** for presentation. The app
+  data directory, window icons and `.tex` data markers now use `CVLaTeX`;
+  existing `CVLaTex` prefs/autosave files and TinyTeX installs are migrated or
+  detected on first run. Release archives from v1.0.0 use the `CVLaTeX` name;
+  the pre-1.0 archives kept the historical `CVLaTex` spelling.
+- The `Add` menu is grouped into Layout, Blocks and Optional sections, with
+  block actions together instead of split across two sections.
+- The preview bar has a simple **Vertical / Side by side** button that stacks
+  the preview above the form and remembers the choice. The default is side by
+  side; no automatic switching unless `Settings → Layout → Automatic` is
+  selected. The stacked mode has a draggable horizontal divider and a remembered
+  preview height. Automatic detection uses the real content box and
+  `ResizeObserver`, and covers narrow half-screens (1280×1080).
+- `Settings → LaTeX engine → Check` now scans the app folder, the legacy
+  `CVLaTeX` folder, the usual TinyTeX/TeX Live/MiKTeX locations and `PATH`,
+  saves the first working engine and shows a diagnostics panel on failure.
+
+### Fixed
+
+- The top menu buttons have larger hit targets, reducing misclicks after a
+  window resize; the remaining offset on Hyprland is the compositor's known
+  stale-pointer bug and is documented in Troubleshooting.
+- TinyTeX installed outside the app's own folder (for example
+  `%APPDATA%\TinyTeX`, `~/.TinyTeX`, `/Library/TeX/texbin` or a TeX Live
+  install) is now detected instead of reported as missing.
+- TinyTeX downloads resume after a dropped connection, retry, and fall back
+  to a SourceForge mirror; a custom mirror can be configured for slow or
+  blocked networks.
+- A failed or corrupt TinyTeX extraction no longer deletes a working
+  installation: the archive is validated in a staging folder and swapped
+  atomically.
+- The close guard and other modals no longer open underneath a stuck splitter
+  drag veil in the vertical layout: pointer capture and blur/visibility
+  handlers end the drag, and modals now sit above the veil with wrapping
+  footers and focus on the primary button. In stacked/narrow windows the close
+  guard stacks its three actions at full width with 38 px hit targets, which
+  also mitigates Hyprland's stale-pointer offset after a surface resize.
+- The initial CSP blocked pywebview's string-injected bridge, leaving the form
+  blank and the preview stuck on “Loading”. The app document now allows
+  `'unsafe-eval'` for that local bridge while still rejecting inline scripts.
+
+### Known limitations
+
+- The Windows and macOS bundles are **unsigned and not notarized**; Windows
+  SmartScreen and macOS Gatekeeper may warn or block the first launch. Verify
+  the SHA-256 checksum before running them.
+- The Linux bundle needs WebKitGTK 4.1 and GObject introspection from the
+  distribution; the macOS build is Apple Silicon only.
+- PDF compile tests skip, rather than fail, when no `pdflatex`/`xelatex`
+  engine is installed.
+- Distribution is archive-based: no installer, package repository,
+  auto-updater or universal macOS binary.
 
 ## [0.3.0] - 2026-11-06
 
@@ -188,6 +311,7 @@ with no account and no server.
   Linux and a `.zip` containing `CVLaTex.app` on macOS. There is no installer,
   package repository, auto-updater or universal macOS binary.
 
+[1.0.0]: https://github.com/Echeq/CVLaTex/releases/tag/v1.0.0
 [0.3.0]: https://github.com/Echeq/CVLaTex/releases/tag/v0.3.0
 [0.2.1]: https://github.com/Echeq/CVLaTex/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Echeq/CVLaTex/releases/tag/v0.2.0

@@ -20,6 +20,8 @@ import latex_gen  # noqa: E402
 import main  # noqa: E402
 import prefs  # noqa: E402
 
+PNG = main.PNG_SIGNATURE
+
 
 @pytest.fixture()
 def prefs_tmp(tmp_path, monkeypatch):
@@ -43,11 +45,11 @@ def test_export_cv_v3_incrusta_medios_y_open_cv_los_materializa(prefs_tmp, monke
     origenes = tmp / "origenes"
     origenes.mkdir()
     foto = origenes / "foto.png"
-    foto.write_bytes(b"contenido-foto-original")
+    foto.write_bytes(PNG + b"contenido-foto-original")
     recorte = origenes / "recorte.png"
-    recorte.write_bytes(b"contenido-recorte-original")
+    recorte.write_bytes(PNG + b"contenido-recorte-original")
     logo = origenes / "logo.png"
-    logo.write_bytes(b"contenido-logo-original")
+    logo.write_bytes(PNG + b"contenido-logo-original")
     gif = origenes / "no-permitido.gif"
     gif.write_bytes(b"no-debe-incrustarse")
     inexistente = origenes / "borrado.png"
@@ -79,9 +81,9 @@ def test_export_cv_v3_incrusta_medios_y_open_cv_los_materializa(prefs_tmp, monke
     assert contenido["data"]["photo_crop"] == rectangulo
 
     esperados = {
-        str(foto): b"contenido-foto-original",
-        str(recorte): b"contenido-recorte-original",
-        str(logo): b"contenido-logo-original",
+        str(foto): PNG + b"contenido-foto-original",
+        str(recorte): PNG + b"contenido-recorte-original",
+        str(logo): PNG + b"contenido-logo-original",
     }
     medios = contenido["media"]
     assert set(medios) == set(esperados)
@@ -107,9 +109,9 @@ def test_export_cv_v3_incrusta_medios_y_open_cv_los_materializa(prefs_tmp, monke
         with open(os.path.join(prefs.CACHE_DIR, nombre), "rb") as f:
             contenidos.add(f.read())
     assert contenidos == {
-        b"contenido-foto-original",
-        b"contenido-recorte-original",
-        b"contenido-logo-original",
+        PNG + b"contenido-foto-original",
+        PNG + b"contenido-recorte-original",
+        PNG + b"contenido-logo-original",
     }
 
     for clave in ("photo", "photo_original", "school_logo"):
@@ -120,11 +122,11 @@ def test_export_cv_v3_incrusta_medios_y_open_cv_los_materializa(prefs_tmp, monke
         assert os.path.realpath(os.path.dirname(ruta_nueva)) == os.path.realpath(prefs.CACHE_DIR)
 
     with open(datos_nuevos["photo"], "rb") as f:
-        assert f.read() == b"contenido-recorte-original"
+        assert f.read() == PNG + b"contenido-recorte-original"
     with open(datos_nuevos["photo_original"], "rb") as f:
-        assert f.read() == b"contenido-foto-original"
+        assert f.read() == PNG + b"contenido-foto-original"
     with open(datos_nuevos["school_logo"], "rb") as f:
-        assert f.read() == b"contenido-logo-original"
+        assert f.read() == PNG + b"contenido-logo-original"
 
     assert datos_nuevos["work"][0]["logo"] == datos_nuevos["school_logo"]
     # El rectangulo de recorte (dict) sobrevive a la importacion v2: el
@@ -139,7 +141,7 @@ def test_export_cv_v3_incrusta_medios_y_open_cv_los_materializa(prefs_tmp, monke
 def test_open_cv_v1_conserva_rutas_y_relena_vacios(prefs_tmp, monkeypatch):
     tmp = prefs_tmp
     ruta_foto = tmp / "antigua.png"
-    ruta_foto.write_bytes(b"foto-v1")
+    ruta_foto.write_bytes(PNG + b"foto-v1")
 
     cvjson = tmp / "v1.cvjson"
     cvjson.write_text(
@@ -193,9 +195,9 @@ def test_autosave_v3_round_trip_devuelve_datos_planos(prefs_tmp):
     origenes = tmp / "medios"
     origenes.mkdir()
     foto = origenes / "foto.png"
-    foto.write_bytes(b"foto-autosave")
+    foto.write_bytes(PNG + b"foto-autosave")
     logo = origenes / "logo.png"
-    logo.write_bytes(b"logo-autosave")
+    logo.write_bytes(PNG + b"logo-autosave")
 
     datos = latex_gen.empty_data()
     datos["cv_language"] = "es"
@@ -229,8 +231,8 @@ def test_autosave_v3_round_trip_devuelve_datos_planos(prefs_tmp):
 
     # Los medios se rematerializan en CACHE_DIR.
     for vieja, nueva, esperado in (
-        (str(foto), leidos["photo"], b"foto-autosave"),
-        (str(logo), leidos["work"][0]["logo"], b"logo-autosave"),
+        (str(foto), leidos["photo"], PNG + b"foto-autosave"),
+        (str(logo), leidos["work"][0]["logo"], PNG + b"logo-autosave"),
     ):
         assert nueva != vieja
         assert os.path.isfile(nueva)

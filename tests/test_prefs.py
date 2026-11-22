@@ -18,26 +18,36 @@ def test_app_dir_for_windows_uses_localappdata():
     result = prefs._app_dir_for(
         "win32", {"LOCALAPPDATA": r"C:\Users\Ana\AppData\Local"}, r"C:\Users\Ana"
     )
-    assert result == os.path.join(r"C:\Users\Ana\AppData\Local", "CVLaTex")
+    assert result == os.path.join(r"C:\Users\Ana\AppData\Local", "CVLaTeX")
     # Without LOCALAPPDATA it falls back to the user home (legacy behavior).
     result = prefs._app_dir_for("win32", {}, r"C:\Users\Ana")
-    assert result == os.path.join(r"C:\Users\Ana", "CVLaTex")
+    assert result == os.path.join(r"C:\Users\Ana", "CVLaTeX")
 
 
 def test_app_dir_for_macos_uses_application_support():
     result = prefs._app_dir_for("darwin", {}, "/Users/ana")
     assert result == os.path.join(
-        "/Users/ana", "Library", "Application Support", "CVLaTex"
+        "/Users/ana", "Library", "Application Support", "CVLaTeX"
     )
 
 
 def test_app_dir_for_linux_uses_xdg_data_home():
     assert prefs._app_dir_for("linux", {}, "/home/ana") == os.path.join(
-        "/home/ana", ".local", "share", "CVLaTex"
+        "/home/ana", ".local", "share", "CVLaTeX"
     )
     assert prefs._app_dir_for(
         "linux", {"XDG_DATA_HOME": "/home/ana/.data"}, "/home/ana"
-    ) == os.path.join("/home/ana/.data", "CVLaTex")
+    ) == os.path.join("/home/ana/.data", "CVLaTeX")
+
+
+def test_defaults_include_font_preferences():
+    assert prefs.DEFAULTS["font_size"] == 11
+    assert prefs.DEFAULTS["font_style"] == ""
+    assert prefs.DEFAULTS["units"] == "cm"
+    assert prefs.DEFAULTS["tinytex_url"] == ""
+    assert prefs.DEFAULTS["split"] == 50
+    assert prefs.DEFAULTS["split_vertical"] == 50
+    assert prefs.DEFAULTS["layout_mode"] == "side"
 
 
 def test_module_attributes_keep_the_expected_layout():
@@ -53,8 +63,8 @@ def test_module_attributes_keep_the_expected_layout():
 
 
 def test_migrate_legacy_app_dir_moves_old_data(tmp_path, monkeypatch):
-    new_dir = tmp_path / "CVLaTex"
-    legacy = tmp_path / "CVLaTeX"
+    new_dir = tmp_path / "CVLaTeX"
+    legacy = tmp_path / "CVLaTex"
     legacy.mkdir()
     (legacy / "prefs.json").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(prefs, "APP_DIR", str(new_dir))
@@ -66,8 +76,8 @@ def test_migrate_legacy_app_dir_moves_old_data(tmp_path, monkeypatch):
 
 
 def test_migrate_legacy_app_dir_keeps_existing_new_data(tmp_path, monkeypatch):
-    new_dir = tmp_path / "CVLaTex"
-    legacy = tmp_path / "CVLaTeX"
+    new_dir = tmp_path / "CVLaTeX"
+    legacy = tmp_path / "CVLaTex"
     new_dir.mkdir()
     legacy.mkdir()
     (new_dir / "prefs.json").write_text("new", encoding="utf-8")
@@ -80,5 +90,5 @@ def test_migrate_legacy_app_dir_keeps_existing_new_data(tmp_path, monkeypatch):
 
 
 def test_migrate_legacy_app_dir_is_a_noop_without_old_data(tmp_path, monkeypatch):
-    monkeypatch.setattr(prefs, "APP_DIR", str(tmp_path / "CVLaTex"))
+    monkeypatch.setattr(prefs, "APP_DIR", str(tmp_path / "CVLaTeX"))
     assert prefs.migrate_legacy_app_dir() is False

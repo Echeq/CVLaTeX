@@ -30,6 +30,7 @@ PREFS_PRUEBA = {
     "paper": "a4",
     "margins": {"top": 2.0, "bottom": 2.0, "left": 2.0, "right": 2.0},
     "font_size": 11,
+    "font_style": "",
 }
 
 COLORES_VALIDOS = {

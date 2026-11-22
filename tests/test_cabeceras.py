@@ -290,6 +290,92 @@ def test_sword_contact_grid_balancea_sin_sociales():
     assert grid.index("\\textbf{Teléfono:}") < grid.index("\\textbf{Correo:}")
 
 
+def test_school_logo_is_a_letterhead_above_the_header(tmp_path, prefs_tmp):
+    """The logo sits in the top corner, before the name and contacts."""
+    d = datos_contactos("es", "classic")
+    logo = tmp_path / "logo.png"
+    logo.write_bytes(b"\x89PNG\r\n\x1a\n")
+    d["school_logo"] = str(logo)
+
+    tex = latex_gen.build_tex(d, prefs.load())
+    body = tex[tex.index("\\begin{document}"):]
+
+    assert tex.count("logo_egresado.png") == 1
+    assert "width=4cm" in tex
+    assert "height=1.5cm" in tex
+    assert body.index("logo_egresado.png") < body.index("\\cvfitname{")
+    assert body.index("logo_egresado.png") < body.index(
+        "\\textbf{%s}" % latex_gen.LANG["es"]["school_name"]
+    )
+
+
+def test_school_logo_can_use_the_right_corner(tmp_path, prefs_tmp):
+    d = datos_contactos("es", "classic")
+    logo = tmp_path / "logo.png"
+    logo.write_bytes(b"\x89PNG\r\n\x1a\n")
+    photo = tmp_path / "photo.png"
+    photo.write_bytes(b"\x89PNG\r\n\x1a\n")
+    d["school_logo"] = str(logo)
+    d["school_logo_side"] = "right"
+    d["photo"] = str(photo)
+
+    tex = latex_gen.build_tex(d, prefs.load())
+
+    # The right-corner logo shares the reserved media column with the photo;
+    # it is not a separate full-width letterhead that moves the left text.
+    assert "\\includegraphics[width=4cm,height=1.5cm" in tex
+    assert tex.index("logo_egresado.png") < tex.index("foto.png")
+    assert "{\\raggedleft \\includegraphics[width=4.5cm" not in tex
+
+
+def test_school_logo_size_is_configurable_and_clamped(tmp_path, prefs_tmp):
+    d = datos_contactos("es", "classic")
+    logo = tmp_path / "logo.png"
+    logo.write_bytes(b"\x89PNG\r\n\x1a\n")
+    d["school_logo"] = str(logo)
+    d["school_logo_width_cm"] = 3.2
+    d["school_logo_height_cm"] = 1.2
+
+    tex = latex_gen.build_tex(d, prefs.load())
+    assert "width=3.2cm" in tex
+    assert "height=1.2cm" in tex
+
+    # The right media column caps the logo so it cannot overflow the layout.
+    d["school_logo_side"] = "right"
+    d["school_logo_width_cm"] = 9.0
+    d["school_logo_height_cm"] = 9.0
+    tex = latex_gen.build_tex(d, prefs.load())
+    assert "width=4cm" in tex
+    assert "height=2cm" in tex
+
+
+def test_harvard_is_designed_without_a_photo(tmp_path, prefs_tmp):
+    d = datos_contactos("es", "harvard")
+    photo = tmp_path / "photo.png"
+    photo.write_bytes(b"\x89PNG\r\n\x1a\n")
+    d["photo"] = str(photo)
+
+    tex = latex_gen.build_tex(d, prefs.load())
+
+    assert "foto.png" not in tex
+
+
+def test_sidebar_school_logo_is_at_the_top_of_the_bar(tmp_path, prefs_tmp):
+    d = datos_contactos("es", "sidebar")
+    logo = tmp_path / "logo.png"
+    logo.write_bytes(b"\x89PNG\r\n\x1a\n")
+    photo = tmp_path / "photo.png"
+    photo.write_bytes(b"\x89PNG\r\n\x1a\n")
+    d["school_logo"] = str(logo)
+    d["photo"] = str(photo)
+
+    tex = latex_gen.build_tex(d, prefs.load())
+
+    assert tex.count("logo_egresado.png") == 1
+    assert "width=4cm" in tex
+    assert tex.index("logo_egresado.png") < tex.index("foto.png")
+
+
 @pytest.mark.latex
 @pytest.mark.skipif(MOTOR_PDF is None, reason="No LaTeX engine (pdflatex) installed")
 @pytest.mark.parametrize("plantilla", TEMPLATES)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the CVLaTex release bundle with PyInstaller (Linux/macOS counterpart of
+# Build the CVLaTeX release bundle with PyInstaller (Linux/macOS counterpart of
 # build.bat).
 #
 # Creates/reuses the checkout's .venv, installs requirements.txt when the build
@@ -8,12 +8,12 @@
 # against that staging tree so personal files never enter the bundle.
 #
 # Outputs:
-#   Linux: dist/CVLaTex_Linux (raw, for local runs) and
-#          dist/CVLaTex-v<version>-linux-x86_64.tar.gz (release archive)
-#   macOS: dist/CVLaTex.app (raw) and
-#          dist/CVLaTex-v<version>-macos-<arch>.zip (release archive)
+#   Linux: dist/CVLaTeX_Linux (raw, for local runs) and
+#          dist/CVLaTeX-v<version>-linux-x86_64.tar.gz (release archive)
+#   macOS: dist/CVLaTeX.app (raw) and
+#          dist/CVLaTeX-v<version>-macos-<arch>.zip (release archive)
 #
-# The macOS .icns is generated from assets/CVLaTex.png with sips/iconutil and
+# The macOS .icns is generated from assets/CVLaTeX.png with sips/iconutil and
 # skipped gracefully when either tool or the PNG is missing; on Linux the PNG
 # is passed through (PyInstaller ignores an unsupported icon harmlessly).
 set -e
@@ -85,7 +85,7 @@ PYINSTALLER_ARGS=(
   --noconfirm
   --onefile
   --windowed
-  --name CVLaTex
+  --name CVLaTeX
   --distpath dist
   --workpath build/pyinstaller
   --specpath build
@@ -94,13 +94,13 @@ PYINSTALLER_ARGS=(
 case "$PLATFORM" in
   Darwin)
     PYINSTALLER_ARGS+=(--osx-bundle-identifier com.echeq.cvlatex)
-    if [ -f assets/CVLaTex.png ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
+    if [ -f assets/CVLaTeX.png ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
       ICONSET_TMP="$(mktemp -d)"
-      ICONSET="$ICONSET_TMP/CVLaTex.iconset"
+      ICONSET="$ICONSET_TMP/CVLaTeX.iconset"
       mkdir -p "$ICONSET"
       # iconutil expects the 1x and @2x variant of every base size.
       generate() {
-        sips -z "$2" "$2" assets/CVLaTex.png --out "$ICONSET/$1" >/dev/null
+        sips -z "$2" "$2" assets/CVLaTeX.png --out "$ICONSET/$1" >/dev/null
       }
       icon_ok=1
       generate icon_16x16.png 16 || icon_ok=0
@@ -113,19 +113,19 @@ case "$PLATFORM" in
       generate "icon_256x256@2x.png" 512 || icon_ok=0
       generate icon_512x512.png 512 || icon_ok=0
       generate "icon_512x512@2x.png" 1024 || icon_ok=0
-      if [ "$icon_ok" = 1 ] && iconutil -c icns "$ICONSET" -o assets/CVLaTex.icns; then
-        PYINSTALLER_ARGS+=(--icon "$(pwd)/assets/CVLaTex.icns")
+      if [ "$icon_ok" = 1 ] && iconutil -c icns "$ICONSET" -o assets/CVLaTeX.icns; then
+        PYINSTALLER_ARGS+=(--icon "$(pwd)/assets/CVLaTeX.icns")
       else
-        echo "warning: could not generate assets/CVLaTex.icns; building without a macOS icon" >&2
+        echo "warning: could not generate assets/CVLaTeX.icns; building without a macOS icon" >&2
       fi
       rm -rf "$ICONSET_TMP"
     else
-      echo "warning: sips/iconutil or assets/CVLaTex.png missing; building without a macOS icon" >&2
+      echo "warning: sips/iconutil or assets/CVLaTeX.png missing; building without a macOS icon" >&2
     fi
     ;;
   *)
-    if [ -f assets/CVLaTex.png ]; then
-      PYINSTALLER_ARGS+=(--icon "$(pwd)/assets/CVLaTex.png")
+    if [ -f assets/CVLaTeX.png ]; then
+      PYINSTALLER_ARGS+=(--icon "$(pwd)/assets/CVLaTeX.png")
     fi
     ;;
 esac
@@ -143,12 +143,12 @@ VERSION="$("$VENV_PY" -c 'import version; print(version.__version__)')"
 
 case "$PLATFORM" in
   Darwin)
-    if [ ! -d dist/CVLaTex.app ]; then
-      echo "error: PyInstaller did not produce dist/CVLaTex.app" >&2
+    if [ ! -d dist/CVLaTeX.app ]; then
+      echo "error: PyInstaller did not produce dist/CVLaTeX.app" >&2
       exit 1
     fi
     if [ -x /usr/libexec/PlistBuddy ]; then
-      PLIST="dist/CVLaTex.app/Contents/Info.plist"
+      PLIST="dist/CVLaTeX.app/Contents/Info.plist"
       set_plist() {
         /usr/libexec/PlistBuddy -c "Set :$1 $VERSION" "$PLIST" 2>/dev/null \
           || /usr/libexec/PlistBuddy -c "Add :$1 string $VERSION" "$PLIST"
@@ -158,7 +158,7 @@ case "$PLATFORM" in
     else
       echo "warning: /usr/libexec/PlistBuddy not found; leaving the bundle version as built" >&2
     fi
-    "$VENV_PY" tools/package_release.py --platform macos --binary dist/CVLaTex.app
+    "$VENV_PY" tools/package_release.py --platform macos --binary dist/CVLaTeX.app
     case "$(uname -m)" in
       arm64|aarch64) ARCH="arm64" ;;
       x86_64|amd64) ARCH="x86_64" ;;
@@ -167,27 +167,27 @@ case "$PLATFORM" in
         exit 1
         ;;
     esac
-    OUTPUT="dist/CVLaTex-v${VERSION}-macos-${ARCH}.zip (unzipped app: dist/CVLaTex.app)"
+    OUTPUT="dist/CVLaTeX-v${VERSION}-macos-${ARCH}.zip (unzipped app: dist/CVLaTeX.app)"
     ;;
   *)
-    if [ ! -f dist/CVLaTex ]; then
-      echo "error: PyInstaller did not produce dist/CVLaTex" >&2
+    if [ ! -f dist/CVLaTeX ]; then
+      echo "error: PyInstaller did not produce dist/CVLaTeX" >&2
       exit 1
     fi
-    mv -f dist/CVLaTex dist/CVLaTex_Linux
-    chmod +x dist/CVLaTex_Linux
+    mv -f dist/CVLaTeX dist/CVLaTeX_Linux
+    chmod +x dist/CVLaTeX_Linux
     # Catch a mixed-Python bundle before packaging. PyInstaller can produce a
     # binary that dies in the bootstrap with "No module named '_struct'" when
     # the stdlib and the bundled libpython come from different installations.
     # Run headless so a healthy build exits instead of opening a window.
-    bootstrap_output="$(env -u DISPLAY -u WAYLAND_DISPLAY timeout 20 ./dist/CVLaTex_Linux 2>&1 || true)"
+    bootstrap_output="$(env -u DISPLAY -u WAYLAND_DISPLAY timeout 20 ./dist/CVLaTeX_Linux 2>&1 || true)"
     if printf '%s\n' "$bootstrap_output" | grep -Eq "ModuleNotFoundError|Module object for .* is NULL"; then
       printf '%s\n' "$bootstrap_output" >&2
       echo "error: the Linux bundle cannot bootstrap its Python runtime" >&2
       exit 1
     fi
-    "$VENV_PY" tools/package_release.py --platform linux --binary dist/CVLaTex_Linux
-    OUTPUT="dist/CVLaTex-v${VERSION}-linux-x86_64.tar.gz (raw: dist/CVLaTex_Linux)"
+    "$VENV_PY" tools/package_release.py --platform linux --binary dist/CVLaTeX_Linux
+    OUTPUT="dist/CVLaTeX-v${VERSION}-linux-x86_64.tar.gz (raw: dist/CVLaTeX_Linux)"
     ;;
 esac
 

@@ -1,3 +1,3 @@
-"""Single source of truth for the CVLaTex release version."""
+"""Single source of truth for the CVLaTeX release version."""
 
-__version__ = "0.3.0"
+__version__ = "1.0.0"

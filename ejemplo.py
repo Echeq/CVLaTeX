@@ -1,12 +1,14 @@
-"""Sample CVs for CVLaTex.
+"""Sample CVs for CVLaTeX.
 
-Return dicts with the same shape as ``latex_gen.empty_data()`` filled with
-realistic content in the language of the CV (Spanish, English or Chinese),
-and without images, so the user sees how to complete each form section.
+Return dicts with the same shape as ``latex_gen.empty_data()`` filled with a
+realistic software-engineering student profile, so the user sees how to
+complete each form section. The three languages tell the same story; only the
+prose and labels are localized.
 
-The three samples tell the same career story: identical dates, links, email
-addresses, phone number, grades and entry counts. Only the prose, the labels
-and the institution names are localized.
+The sample is deliberately simple and uses the project owner's public
+identifiers: Elvis Enrique Chen Qiu / 陈昌发, HUST Software Engineering,
+GitHub and LinkedIn handles ``ECHEQ``, and the example address
+``echeq@github.com``. The phone number is fake.
 """
 
 import copy
@@ -16,211 +18,182 @@ import latex_gen
 
 _LANGUAGES = ("zh", "es", "en")
 
-# Header data shared by every language. The sample is deliberately fictional.
-_EMAIL = "alex.ruiz@example.com"
-_PHONE = "+34 600 000 000"
+# Shared, deliberately public sample identifiers. The phone number is fake.
+_EMAIL = "echeq@github.com"
+_PHONE = "123-456-78"
 _SOCIALS = (
-    {"network": "github", "label": "", "value": "github.com/example"},
-    {"network": "linkedin", "label": "", "value": "linkedin.com/in/example"},
+    {"network": "github", "label": "", "value": "github.com/ECHEQ"},
+    {"network": "linkedin", "label": "", "value": "linkedin.com/in/ECHEQ"},
 )
 
-# Same institutions in the three samples; Chinese localizes their names.
-_UNIVERSITIES = {
-    "es": ("Universidad Politécnica de Madrid", "Universidad de Valladolid"),
-    "en": ("Universidad Politécnica de Madrid", "Universidad de Valladolid"),
-    "zh": ("马德里理工大学", "巴利亚多利德大学"),
+_UNIVERSITY = {
+    "es": "Universidad de Ciencia y Tecnología de Huazhong (HUST)",
+    "en": "Huazhong University of Science and Technology (HUST)",
+    "zh": "华中科技大学",
 }
 
 _TEXT = {
     "es": {
-        "name": "ALEJANDRO RUIZ MARTÍN",
-        "profession": "Desarrollador de software backend",
-        "address": "Madrid, España",
-        "birth_label": "Nacimiento",
-        "birth_value": "01/01/1995",
-        "nationality_label": "Nacionalidad",
-        "nationality_value": "Española",
+        "name": "ELVIS ENRIQUE CHEN QIU",
+        "profession": "Estudiante de Ingeniería de Software",
+        "address": "Wuhan, Hubei, China",
         "summary": (
-            "Desarrollador backend con seis años de experiencia en Python y Java. "
-            "Especializado en APIs, microservicios y despliegues en la nube."
+            "Estudiante de Ingeniería de Software en HUST (China), centrado en "
+            "aplicaciones de escritorio multiplataforma, herramientas LaTeX y "
+            "código abierto. Creador de CVLaTeX, un editor de CV local con 12 "
+            "plantillas y exportación a PDF, Word y LaTeX."
         ),
-        "work_position": "Desarrollador Backend Senior",
+        "location_label": "Ubicación",
+        "location_value": "Wuhan, China",
+        "availability_label": "Disponibilidad",
+        "availability_value": "Prácticas / jornada completa",
+        "work_position": "Mantenedor de código abierto",
         "work_end": "Actualidad",
         "work_achievements": (
-            "Diseñé la API de pagos con FastAPI para más de dos millones de "
-            "transacciones al mes.\n"
-            "Mentoricé a tres desarrolladores junior y promoví las pruebas "
-            "automatizadas."
+            "Diseñé y construí CVLaTeX, un editor de CV local con 12 plantillas "
+            "LaTeX, exportación a PDF/Word/LaTeX y sin cuenta ni nube.\n"
+            "Añadí más de 900 pruebas automatizadas y CI para tres sistemas operativos; "
+            "documenté convenciones de CV para seis mercados."
         ),
-        "internship1_position": "Becario de Desarrollo",
-        "internship1_achievements": (
-            "Automaticé los informes semanales con scripts de Python, ahorrando "
-            "seis horas de trabajo."
+        "internship_position": "Becario de Ingeniería de Software",
+        "internship_company": "Laboratorio de Ingeniería de Software de HUST",
+        "internship_achievements": (
+            "Desarrollé un proyecto de curso sobre APIs REST y bases de datos, "
+            "con pruebas automatizadas y documentación técnica."
         ),
-        "internship2_position": "Becario de Análisis de Datos",
-        "internship2_achievements": (
-            "Limpié y analicé 200.000 registros de usuarios con Python y Pandas "
-            "para el informe semanal de operaciones.\n"
-            "Construí un panel de indicadores que redujo a la mitad el tiempo de "
-            "preparación del informe mensual."
-        ),
-        "project1_name": "Rutas Sostenibles",
+        "project1_name": "CVLaTeX",
+        "project1_organization": "Proyecto personal",
         "project1_description": (
-            "Aplicación web que calcula rutas de transporte público con menor "
-            "huella de carbono.\n"
-            "Backend en Flask con datos abiertos GTFS y panel de estadísticas."
+            "Editor de escritorio para crear CV con plantillas LaTeX, vista "
+            "previa PDF, exportación a Word y LaTeX, autosave local y soporte "
+            "para chino, español e inglés."
         ),
-        "project1_result": "Primer premio del jurado entre 42 equipos",
-        "project2_name": "Panel de Métricas Abiertas",
-        "project2_description": (
-            "Panel web que visualiza datos abiertos del Ayuntamiento de Madrid.\n"
-            "Backend en FastAPI y PostgreSQL con actualización diaria de los datos."
-        ),
-        "project2_result": (
-            "Más de 300 estrellas en GitHub y adoptado por tres organizaciones "
-            "locales"
-        ),
-        "university_project_name": "Club de Robótica",
-        "university_project_course": "Vocal de proyectos",
+        "project1_result": "900+ tests, CI en 3 sistemas y licencia MIT",
+        "university_project_name": "Taller de código abierto de HUST",
+        "university_project_course": "Coordinador",
         "university_project_description": (
-            "Coordiné talleres de robótica para estudiantes de primero y "
+            "Coordiné talleres de Git y LaTeX para estudiantes de primero y "
             "segundo curso.\n"
-            "Organicé una competición interna con 12 equipos."
+            "Acompañé a 8 equipos en la publicación de sus primeros proyectos."
         ),
-        "university_project_result": "Finalista en la competición regional",
-        "degree_master": "Máster en Ingeniería Informática",
-        "degree_bachelor": "Grado en Ingeniería del Software",
-        "skill_languages": "Lenguajes",
+        "university_project_result": "40 estudiantes y 8 proyectos publicados",
+        "degree": "Ingeniería de Software",
+        "skill_languages": "Programación",
         "skill_tools": "Herramientas",
-        "skill_certs": "Certificaciones",
-        "cert_values": "AWS Cloud Practitioner, Scrum Foundation",
-        "language1": "Español",
+        "skill_other": "Otros",
+        "skill_other_values": "Qt/QML, APIs REST, CI/CD",
+        "language1": "Chino",
         "language1_level": "Nativo",
         "language2": "Inglés",
         "language2_level": "C1 — Avanzado",
+        "language3": "Español",
+        "language3_level": "B2 — Intermedio alto",
     },
     "en": {
-        "name": "ALEJANDRO RUIZ MARTÍN",
-        "profession": "Backend software developer",
-        "address": "Madrid, Spain",
-        "birth_label": "Date of birth",
-        "birth_value": "01/01/1995",
-        "nationality_label": "Nationality",
-        "nationality_value": "Spanish",
+        "name": "ELVIS ENRIQUE CHEN QIU",
+        "profession": "Software Engineering student",
+        "address": "Wuhan, Hubei, China",
         "summary": (
-            "Backend developer with six years of experience in Python and Java, "
-            "specializing in APIs, microservices and cloud deployments."
+            "Software Engineering student at HUST (China), focused on "
+            "cross-platform desktop applications, LaTeX tooling and open "
+            "source. Creator of CVLaTeX, a local-first CV editor with 12 "
+            "templates and PDF, Word and LaTeX export."
         ),
-        "work_position": "Senior Backend Developer",
+        "location_label": "Location",
+        "location_value": "Wuhan, China",
+        "availability_label": "Availability",
+        "availability_value": "Internship / full time",
+        "work_position": "Open-source maintainer",
         "work_end": "Present",
         "work_achievements": (
-            "Designed the payments API with FastAPI, handling more than two "
-            "million transactions a month.\n"
-            "Mentored three junior developers and championed automated testing."
+            "Designed and built CVLaTeX, a local-first CV editor with 12 LaTeX "
+            "templates, PDF/Word/LaTeX export and no account or cloud.\n"
+            "Added over 900 automated tests and a three-OS CI pipeline; documented "
+            "CV conventions for six markets."
         ),
-        "internship1_position": "Software Development Intern",
-        "internship1_achievements": (
-            "Automated the weekly reports with Python scripts, saving six hours "
-            "of work each week."
+        "internship_position": "Software Engineering Intern",
+        "internship_company": "HUST Software Engineering Laboratory",
+        "internship_achievements": (
+            "Built a course project around REST APIs and databases, with "
+            "automated tests and technical documentation."
         ),
-        "internship2_position": "Data Analysis Intern",
-        "internship2_achievements": (
-            "Cleaned and analysed 200,000 user records with Python and Pandas "
-            "for the weekly operations report.\n"
-            "Built a dashboard that halved the time needed to prepare the "
-            "monthly report."
-        ),
-        "project1_name": "Sustainable Routes",
+        "project1_name": "CVLaTeX",
+        "project1_organization": "Personal project",
         "project1_description": (
-            "Web app that calculates public transport routes with the lowest "
-            "carbon footprint.\n"
-            "Flask backend using open GTFS data, plus a statistics dashboard."
+            "Desktop editor that builds a CV from LaTeX templates, with PDF "
+            "preview, Word and LaTeX export, local autosave and Chinese, "
+            "Spanish and English support."
         ),
-        "project1_result": "First prize from the jury among 42 teams",
-        "project2_name": "Open Metrics Dashboard",
-        "project2_description": (
-            "Web dashboard that visualises open data from the City of Madrid.\n"
-            "FastAPI and PostgreSQL backend with daily data refreshes."
-        ),
-        "project2_result": (
-            "Over 300 stars on GitHub and adopted by three local organisations"
-        ),
-        "university_project_name": "Robotics Club",
-        "university_project_course": "Project officer",
+        "project1_result": "900+ tests, 3-OS CI and MIT license",
+        "university_project_name": "HUST Open Source Workshop",
+        "university_project_course": "Co-organizer",
         "university_project_description": (
-            "Coordinated robotics workshops for first- and second-year "
-            "students.\n"
-            "Organised an internal competition with 12 teams."
+            "Ran Git and LaTeX workshops for first- and second-year students.\n"
+            "Supported 8 teams publishing their first projects."
         ),
-        "university_project_result": "Regional competition finalist",
-        "degree_master": "Master's in Computer Engineering",
-        "degree_bachelor": "Bachelor's in Software Engineering",
-        "skill_languages": "Languages",
+        "university_project_result": "40 students and 8 published projects",
+        "degree": "Software Engineering",
+        "skill_languages": "Programming",
         "skill_tools": "Tools",
-        "skill_certs": "Certifications",
-        "cert_values": "AWS Cloud Practitioner, Scrum Foundation",
-        "language1": "Spanish",
+        "skill_other": "Other",
+        "skill_other_values": "Qt/QML, REST APIs, CI/CD",
+        "language1": "Chinese",
         "language1_level": "Native",
         "language2": "English",
         "language2_level": "C1 — Advanced",
+        "language3": "Spanish",
+        "language3_level": "B2 — Upper intermediate",
     },
     "zh": {
-        "name": "ALEJANDRO RUIZ MARTÍN",
-        "profession": "后端软件开发工程师",
-        "address": "西班牙马德里",
-        "birth_label": "出生年月",
-        "birth_value": "1995年1月1日",
-        "nationality_label": "国籍",
-        "nationality_value": "中国",
+        "name": "陈昌发",
+        "profession": "软件工程专业学生",
+        "address": "中国湖北武汉",
         "summary": (
-            "拥有六年 Python 与 Java 开发经验的后端工程师，专注于 API、微服务"
-            "与云端部署。"
+            "华中科技大学软件工程专业学生，专注于跨平台桌面应用、LaTeX 工具与"
+            "开源项目。CVLaTeX 的作者：一款本地优先、内置 12 套模板并支持 "
+            "PDF/Word/LaTeX 导出的简历编辑器。"
         ),
-        "work_position": "高级后端开发工程师",
+        "location_label": "所在地",
+        "location_value": "中国武汉",
+        "availability_label": "求职意向",
+        "availability_value": "实习 / 全职",
+        "work_position": "开源项目维护者",
         "work_end": "至今",
         "work_achievements": (
-            "使用 FastAPI 设计支付 API，每月处理超过两百万笔交易。\n"
-            "指导三名初级开发者，并推动自动化测试落地。"
+            "设计并开发 CVLaTeX：一款本地优先的简历编辑器，内置 12 套 LaTeX "
+            "模板，支持 PDF/Word/LaTeX 导出，无需账号或云端。\n"
+            "添加超过 900 个自动化测试和三平台 CI；为六个市场整理简历规范。"
         ),
-        "internship1_position": "软件开发实习生",
-        "internship1_achievements": (
-            "使用 Python 脚本自动生成周报，每周节省六小时工作量。"
+        "internship_position": "软件工程实习生",
+        "internship_company": "华中科技大学软件工程实验室",
+        "internship_achievements": (
+            "完成 REST API 与数据库课程项目，包含自动化测试和技术文档。"
         ),
-        "internship2_position": "数据分析实习生",
-        "internship2_achievements": (
-            "使用 Python 与 Pandas 清洗并分析 20 万条用户记录，为每周运营"
-            "报告提供数据支持。\n"
-            "搭建指标看板，将月度报告的准备时间缩短一半。"
-        ),
-        "project1_name": "可持续出行路线",
+        "project1_name": "CVLaTeX",
+        "project1_organization": "个人项目",
         "project1_description": (
-            "计算碳排放最低的公共交通路线的 Web 应用。\n"
-            "后端采用 Flask，接入 GTFS 开放数据，并提供统计面板。"
+            "桌面简历编辑器：使用 LaTeX 模板生成简历，支持 PDF 预览、Word 与 "
+            "LaTeX 导出、本地自动保存，以及中文、西班牙语和英语。"
         ),
-        "project1_result": "在 42 支队伍中获评委会一等奖",
-        "project2_name": "开放指标看板",
-        "project2_description": (
-            "展示马德里市政府开放数据的 Web 指标看板。\n"
-            "后端采用 FastAPI 与 PostgreSQL，数据每日更新。"
-        ),
-        "project2_result": "GitHub 获 300 余颗星，并被三家本地机构采用",
-        "university_project_name": "机器人社团",
-        "university_project_course": "项目负责人",
+        "project1_result": "900+ 个测试、三平台 CI、MIT 许可证",
+        "university_project_name": "华中科技大学开源工作坊",
+        "university_project_course": "组织者",
         "university_project_description": (
-            "为大一、大二学生组织机器人工作坊。\n"
-            "筹办 12 支队伍参加的校内比赛。"
+            "为大一、大二学生组织 Git 与 LaTeX 工作坊。\n"
+            "指导 8 支队伍发布他们的第一个开源项目。"
         ),
-        "university_project_result": "区域比赛决赛入围",
-        "degree_master": "计算机工程硕士",
-        "degree_bachelor": "软件工程学士",
+        "university_project_result": "40 名学生、8 个项目",
+        "degree": "软件工程",
         "skill_languages": "编程语言",
         "skill_tools": "工具",
-        "skill_certs": "证书",
-        "cert_values": "AWS 云从业者, Scrum Foundation",
-        "language1": "西班牙语",
+        "skill_other": "其他",
+        "skill_other_values": "Qt/QML、REST API、CI/CD",
+        "language1": "中文",
         "language1_level": "母语",
         "language2": "英语",
         "language2_level": "C1 — 高级",
+        "language3": "西班牙语",
+        "language3_level": "B2 — 中高级",
     },
 }
 
@@ -235,12 +208,11 @@ def _normalize_language(cv_language):
 
 
 def _build_sample(lang):
-    """Build the canonical career story with the text of ``lang``."""
+    """Build the HUST software-engineering story with the text of ``lang``."""
     text = _TEXT[lang]
-    university, bachelor_university = _UNIVERSITIES[lang]
+    university = _UNIVERSITY[lang]
 
     d = copy.deepcopy(latex_gen.empty_data())
-
     d["cv_language"] = lang
     d["template"] = "classic"
     d["name"] = text["name"]
@@ -252,18 +224,18 @@ def _build_sample(lang):
     d["school_name"] = university
 
     d["extra_fields"] = [
-        {"label": text["birth_label"], "value": text["birth_value"]},
-        {"label": text["nationality_label"], "value": text["nationality_value"]},
+        {"label": text["location_label"], "value": text["location_value"]},
+        {"label": text["availability_label"], "value": text["availability_value"]},
     ]
 
     d["summary"] = text["summary"]
 
     d["work"] = [
         {
-            "work_mode": "hybrid",
+            "work_mode": "remote",
             "position": text["work_position"],
-            "company": "Fintech Nova",
-            "start": "2022",
+            "company": "CVLaTeX",
+            "start": "2026",
             "end": text["work_end"],
             "achievements": text["work_achievements"],
             "logo": "",
@@ -273,20 +245,11 @@ def _build_sample(lang):
     d["internships"] = [
         {
             "work_mode": "onsite",
-            "position": text["internship1_position"],
-            "company": "Telecom Ibérica",
-            "start": "2018",
-            "end": "2019",
-            "achievements": text["internship1_achievements"],
-            "logo": "",
-        },
-        {
-            "work_mode": "onsite",
-            "position": text["internship2_position"],
-            "company": "DataLab Valladolid",
-            "start": "2017",
-            "end": "2018",
-            "achievements": text["internship2_achievements"],
+            "position": text["internship_position"],
+            "company": text["internship_company"],
+            "start": "2025",
+            "end": "2025",
+            "achievements": text["internship_achievements"],
             "logo": "",
         },
     ]
@@ -294,22 +257,12 @@ def _build_sample(lang):
     d["projects"] = [
         {
             "name": text["project1_name"],
-            "organization": "Hackathon Climate 2023",
-            "start": "2023",
-            "end": "2023",
+            "organization": text["project1_organization"],
+            "start": "2026",
+            "end": text["work_end"],
             "description": text["project1_description"],
             "result": text["project1_result"],
-            "link": "github.com/example/rutas-sostenibles",
-            "logo": "",
-        },
-        {
-            "name": text["project2_name"],
-            "organization": "Open Data Madrid",
-            "start": "2021",
-            "end": "2021",
-            "description": text["project2_description"],
-            "result": text["project2_result"],
-            "link": "github.com/example/panel-metricas",
+            "link": "github.com/ECHEQ/CVLaTeX",
             "logo": "",
         },
     ]
@@ -319,8 +272,8 @@ def _build_sample(lang):
             "name": text["university_project_name"],
             "course": text["university_project_course"],
             "organization": university,
-            "start": "2018",
-            "end": "2018",
+            "start": "2025",
+            "end": "2025",
             "description": text["university_project_description"],
             "result": text["university_project_result"],
             "link": "",
@@ -330,38 +283,36 @@ def _build_sample(lang):
 
     d["education"] = [
         {
-            "degree_type": "master",
-            "degree": text["degree_master"],
-            "institution": university,
-            "start": "2018",
-            "end": "2020",
-            "grade": "9.2 / 10",
-            "logo": "",
-        },
-        {
             "degree_type": "bachelor",
-            "degree": text["degree_bachelor"],
-            "institution": bachelor_university,
-            "start": "2014",
-            "end": "2018",
-            "grade": "8.5 / 10",
+            "degree": text["degree"],
+            "institution": university,
+            "start": "2022",
+            "end": "2026",
+            "grade": "",
             "logo": "",
         },
     ]
 
     d["skills"] = [
-        {"category": text["skill_languages"], "values": "Python, Java, SQL"},
-        {"category": text["skill_tools"], "values": "Docker, Git, PostgreSQL"},
-        {"category": text["skill_certs"], "values": text["cert_values"]},
+        {"category": text["skill_languages"], "values": "Python, Java, JavaScript, SQL"},
+        {"category": text["skill_tools"], "values": "Git, Docker, Linux, LaTeX"},
+        {"category": text["skill_other"], "values": text["skill_other_values"]},
     ]
 
     d["languages"] = [
         {"language": text["language1"], "level": text["language1_level"]},
         {"language": text["language2"], "level": text["language2_level"]},
+        {"language": text["language3"], "level": text["language3_level"]},
     ]
 
-    d["references"] = [
-        {"name": "Ana Torres Ruiz", "contact": "ana.torres@fintechnova.com"},
+    # One separator block so the sample also demonstrates the free dividers.
+    d["blocks"] = [
+        {
+            "id": "sample-divider",
+            "type": "separator",
+            "style": "line",
+            "position": "work",
+        },
     ]
 
     return d
@@ -373,10 +324,10 @@ def sample_data(cv_language="es"):
 
 
 def sample_data_zh():
-    """Return the Chinese sample CV (same career story as the Spanish one)."""
+    """Return the Chinese sample CV (same story as the Spanish one)."""
     return sample_data("zh")
 
 
 def sample_data_en():
-    """Return the English sample CV (same career story as the Spanish one)."""
+    """Return the English sample CV (same story as the Spanish one)."""
     return sample_data("en")

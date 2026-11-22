@@ -25,6 +25,8 @@ import main  # noqa: E402
 import messages  # noqa: E402
 import prefs  # noqa: E402
 
+PNG = main.PNG_SIGNATURE
+
 
 @pytest.fixture()
 def prefs_tmp(tmp_path, monkeypatch):
@@ -58,7 +60,7 @@ def _wait_until(predicate, timeout=5.0):
 def test_open_cv_v2_backs_up_once_and_returns_english_data(prefs_tmp, monkeypatch):
     tmp = prefs_tmp
     photo = tmp / "foto-v2.png"
-    photo.write_bytes(b"foto-v2")
+    photo.write_bytes(PNG + b"foto-v2")
     cvjson = tmp / "antiguo.cvjson"
     cvjson.write_text(
         json.dumps(
@@ -72,7 +74,7 @@ def test_open_cv_v2_backs_up_once_and_returns_english_data(prefs_tmp, monkeypatc
                 "medios": {
                     str(photo): {
                         "nombre": "foto-v2.png",
-                        "b64": base64.b64encode(b"foto-v2").decode("ascii"),
+                        "b64": base64.b64encode(PNG + b"foto-v2").decode("ascii"),
                     }
                 },
             },
@@ -110,7 +112,7 @@ def test_open_cv_v2_backs_up_once_and_returns_english_data(prefs_tmp, monkeypatc
 def test_export_cv_writes_v3_envelope_with_data_and_media(prefs_tmp, monkeypatch):
     tmp = prefs_tmp
     photo = tmp / "foto.png"
-    photo.write_bytes(b"foto-v3")
+    photo.write_bytes(PNG + b"foto-v3")
     data = latex_gen.empty_data()
     data["name"] = "Ana"
     data["photo"] = str(photo)
@@ -124,7 +126,7 @@ def test_export_cv_writes_v3_envelope_with_data_and_media(prefs_tmp, monkeypatch
     assert "datos" not in content and "medios" not in content
     assert content["data"]["name"] == "Ana"
     assert content["media"][str(photo)]["name"] == "foto.png"
-    assert content["media"][str(photo)]["b64"] == base64.b64encode(b"foto-v3").decode("ascii")
+    assert content["media"][str(photo)]["b64"] == base64.b64encode(PNG + b"foto-v3").decode("ascii")
 
     # v3 round trip: media materializes and no legacy backup is created.
     opened = _api_opening(monkeypatch, out).open_cv()
@@ -201,7 +203,7 @@ def test_open_cv_migrates_the_legacy_contacts(prefs_tmp, monkeypatch):
 def test_autosave_round_trip_v3_and_legacy_plain_dict(prefs_tmp):
     tmp = prefs_tmp
     photo = tmp / "foto.png"
-    photo.write_bytes(b"foto-autosave")
+    photo.write_bytes(PNG + b"foto-autosave")
     data = latex_gen.empty_data()
     data["name"] = "Ana"
     data["photo"] = str(photo)
@@ -349,13 +351,13 @@ def test_messages_tables_cover_every_key_and_fall_back_to_english(prefs_tmp):
 
 
 def test_window_title_languages(prefs_tmp):
-    assert main.window_title("es") == "CVLaTex — Editor de CV"
-    assert main.window_title("en") == "CVLaTex — CV Editor"
-    assert main.window_title("zh") == "CVLaTex — 简历编辑器"
-    assert main.window_title("ru") == "CVLaTex — Редактор резюме"
+    assert main.window_title("es") == "CVLaTeX — Editor de CV"
+    assert main.window_title("en") == "CVLaTeX — CV Editor"
+    assert main.window_title("zh") == "CVLaTeX — 简历编辑器"
+    assert main.window_title("ru") == "CVLaTeX — Редактор резюме"
     # An unknown or missing language falls back to English (the default).
-    assert main.window_title(None) == "CVLaTex — CV Editor"
-    assert main.window_title("fr") == "CVLaTex — CV Editor"
+    assert main.window_title(None) == "CVLaTeX — CV Editor"
+    assert main.window_title("fr") == "CVLaTeX — CV Editor"
 
 
 def test_prefs_ui_language_defaults_to_english(prefs_tmp, monkeypatch):
@@ -402,13 +404,13 @@ def test_install_done_uses_ui_language(prefs_tmp, monkeypatch):
     assert pushes[0][1]["msg"] == "TinyTeX installed successfully."
 
 
-def test_install_checksum_warning_is_pushed_and_repeated(prefs_tmp, monkeypatch):
+def test_install_warning_is_pushed_and_repeated(prefs_tmp, monkeypatch):
     """A non-fatal install warning surfaces live and with the done envelope."""
     prefs.set("ui_language", "en")
 
     def fake_install(progress, cancel_event=None, warn=None):
         progress(1, 2)
-        warn(messages.t("install_checksum_warning"))
+        warn(messages.t("install_insecure_mirror"))
         return r"C:\fake\pdflatex.exe"
 
     monkeypatch.setattr(latex_engine, "install_tinytex", fake_install)
@@ -418,7 +420,7 @@ def test_install_checksum_warning_is_pushed_and_repeated(prefs_tmp, monkeypatch)
 
     assert api.install_latex() == "ok"
     _wait_until(lambda: len(pushes) >= 3)
-    warning = messages.t("install_checksum_warning")
+    warning = messages.t("install_insecure_mirror")
     assert pushes == [
         ("__onInstallProgress", {"hecho": 1, "total": 2}),
         ("__onInstallProgress", {"warning": warning}),
@@ -462,6 +464,57 @@ def test_cancel_install_sets_the_event(prefs_tmp, monkeypatch):
     # Once the install finished, cancel_install is a no-op.
     _wait_until(lambda: api._cancel_event is None)
     assert api.cancel_install() == {"ok": False, "cancelado": True}
+
+
+def test_check_latex_saves_the_detected_path(prefs_tmp, monkeypatch):
+    monkeypatch.setattr(
+        latex_engine, "find_pdflatex", lambda *a, **k: "/found/pdflatex"
+    )
+    api = main.Api(None)
+    assert api.check_latex() == {"ok": True, "path": "/found/pdflatex"}
+    assert prefs.get("latex_path") == "/found/pdflatex"
+
+
+def test_check_latex_returns_diagnostics_when_missing(prefs_tmp, monkeypatch):
+    monkeypatch.setattr(latex_engine, "find_pdflatex", lambda *a, **k: None)
+    monkeypatch.setattr(
+        latex_engine, "pdflatex_diagnostics", lambda *a, **k: {"platform": "linux"}
+    )
+    api = main.Api(None)
+    assert api.check_latex() == {
+        "ok": False, "path": None, "diagnostics": {"platform": "linux"},
+    }
+
+
+def test_install_from_file_is_cancelled_before_the_dialog(
+    prefs_tmp, monkeypatch
+):
+    api = main.Api(None)
+    monkeypatch.setattr(api, "choose_file", lambda *a, **k: None)
+    assert api.install_latex_from_file() == {"ok": False, "cancelado": True}
+
+
+def test_install_from_file_uses_the_selected_archive(prefs_tmp, monkeypatch):
+    seen = {}
+
+    def fake_install(path, progress, cancel_event=None, warn=None):
+        seen["path"] = path
+        seen["cancel_event"] = cancel_event
+        return "/found/pdflatex"
+
+    monkeypatch.setattr(latex_engine, "install_from_archive", fake_install)
+    api = main.Api(None)
+    monkeypatch.setattr(api, "choose_file", lambda *a, **k: "/tmp/tinytex.tar.gz")
+    pushes = []
+    monkeypatch.setattr(api, "_push", lambda name, data: pushes.append((name, data)))
+
+    assert api.install_latex_from_file() == "ok"
+    _wait_until(lambda: bool(pushes))
+    assert seen["path"] == "/tmp/tinytex.tar.gz"
+    assert seen["cancel_event"] is not None
+    assert pushes[-1][0] == "__onInstallDone"
+    assert pushes[-1][1]["ok"] is True
+    assert pushes[-1][1]["path"] == "/found/pdflatex"
 
 
 # ---------------------------------------------------------------------------
@@ -542,14 +595,14 @@ def test_identical_tex_skips_the_engine(prefs_tmp, monkeypatch):
 def test_collect_media_cache_hits_by_path_mtime_size(prefs_tmp):
     tmp = prefs_tmp
     photo = tmp / "foto.png"
-    photo.write_bytes(b"abc")
+    photo.write_bytes(PNG + b"abc")
     data = latex_gen.empty_data()
     data["photo"] = str(photo)
 
     cache = {}
     first = main.collect_media(data, cache)
     assert len(cache) == 1
-    assert first[str(photo)]["b64"] == base64.b64encode(b"abc").decode("ascii")
+    assert first[str(photo)]["b64"] == base64.b64encode(PNG + b"abc").decode("ascii")
 
     # Unchanged file: the cached entry is reused instead of re-encoded.
     cached = next(iter(cache.values()))
@@ -557,10 +610,10 @@ def test_collect_media_cache_hits_by_path_mtime_size(prefs_tmp):
     assert second[str(photo)] is cached
 
     # Changed size/mtime -> new key and a fresh entry.
-    photo.write_bytes(b"abcd")
+    photo.write_bytes(PNG + b"abcd")
     os.utime(photo, (time.time() + 10, time.time() + 10))
     third = main.collect_media(data, cache)
-    assert third[str(photo)]["b64"] == base64.b64encode(b"abcd").decode("ascii")
+    assert third[str(photo)]["b64"] == base64.b64encode(PNG + b"abcd").decode("ascii")
     assert len(cache) == 2
 
 
@@ -578,7 +631,6 @@ SAMPLE_SECTIONS = (
     "work",
     "skills",
     "languages",
-    "references",
 )
 SAMPLE_LIST_SECTIONS = tuple(
     section for section in SAMPLE_SECTIONS if section != "summary"
@@ -665,7 +717,8 @@ FROZEN_API_METHODS = {
     "init", "empty_data", "load_sample", "template_colors", "choose_file",
     "choose_photo", "save_image", "export_pdf", "export_tex", "export_docx",
     "export_cv", "open_cv", "autosave", "autosave_read", "autosave_clear",
-    "import_tex", "install_latex", "cancel_install", "choose_latex_path",
+    "import_tex", "install_latex", "install_latex_from_file",
+    "cancel_install", "choose_latex_path",
     "check_latex", "open_preview", "set_prefs", "get_prefs", "dismiss_setup",
     "compile", "compile_tex", "set_dirty", "quit_app",
 }

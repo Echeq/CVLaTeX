@@ -1,4 +1,4 @@
-"""pywebview shell for CVLaTex plus the local HTTP server that feeds the UI.
+"""pywebview shell for CVLaTeX plus the local HTTP server that feeds the UI.
 
 `Api` methods are the JavaScript bridge (`window.pywebview.api.*`); the frozen
 bridge surface is pinned by tests/test_frontend.py and documented in
@@ -35,7 +35,7 @@ import tex_datos
 
 BASE_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.path.join(BASE_DIR, "web")
-ICON_PATH = os.path.join(BASE_DIR, "assets", "CVLaTex.ico")
+ICON_PATH = os.path.join(BASE_DIR, "assets", "CVLaTeX.ico")
 ROUTES = {
     "/app.js": os.path.join(WEB_DIR, "app.js"),
     "/style.css": os.path.join(WEB_DIR, "style.css"),
@@ -54,17 +54,91 @@ MEDIA_NAME_RE = re.compile(
 )
 PDF_NAME_RE = re.compile(r"^[^/\\]+\.pdf$", re.IGNORECASE)
 
+# Upload/import limits. They are deliberately generous for a CV (a 12 MB
+# photo is already huge) but stop a malformed data URL or a crafted .cvjson
+# from exhausting memory or filling the cache directory.
+MAX_IMAGE_BYTES = 12 * 1024 * 1024
+MAX_MEDIA_BYTES = MAX_IMAGE_BYTES
+MAX_MEDIA_TOTAL_BYTES = 64 * 1024 * 1024
+MAX_CVJSON_BYTES = 50 * 1024 * 1024
+# Base64 grows by 4/3; the small margin covers the data URL header.
+MAX_DATA_URL_CHARS = (MAX_IMAGE_BYTES * 4) // 3 + 256
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+JPEG_SIGNATURE = b"\xff\xd8\xff"
+
+# Content Security Policy. The app UI has no inline scripts, so script-src
+# keeps 'self'; 'unsafe-eval' is required because pywebview injects its JS
+# bridge by evaluating a string (without it the window never gets
+# `window.pywebview`, the form stays blank and the preview waits forever).
+# Inline styles are still required because app.js positions the crop box with
+# element.style. PDF.js needs its own inline bootstrap scripts.
+APP_CSP = (
+    "default-src 'none'; script-src 'self' 'unsafe-eval'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: blob:; font-src 'self'; media-src 'self'; "
+    "connect-src 'self'; frame-src 'self'; worker-src 'self' blob:; "
+    "object-src 'none'; base-uri 'none'; form-action 'none'; "
+    "frame-ancestors 'none'"
+)
+PDFJS_CSP = (
+    "default-src 'none'; script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+    "font-src 'self'; connect-src 'self' blob:; worker-src 'self' blob:; "
+    "child-src 'self' blob:; object-src 'none'; base-uri 'none'; "
+    "form-action 'none'; frame-ancestors 'self'"
+)
+# A compiled PDF is framed by the app on Windows/macOS (native viewer) and by
+# the PDF.js viewer on Linux; it never needs scripts of its own. Keep this CSP
+# minimal: `default-src 'none'` on a PDF can interfere with the native viewer's
+# internal resources.
+PREVIEW_CSP = "frame-ancestors 'self'"
+PERMISSIONS_POLICY = (
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=(), "
+    "serial=(), hid=(), display-capture=()"
+)
+
+
+def _csp_for(path):
+    """CSP matching the document served at `path`."""
+    if path.startswith("/pdfjs/"):
+        return PDFJS_CSP
+    if path.startswith("/preview/"):
+        return PREVIEW_CSP
+    return APP_CSP
+
+
+def _frame_option_for(path):
+    """X-Frame-Options: only the app's own preview routes may be framed."""
+    if path.startswith(("/pdfjs/", "/preview/")):
+        return "SAMEORIGIN"
+    return "DENY"
+
+
+def _image_matches(raw, ext_or_mime):
+    """True when `raw` starts with the signature of the declared format."""
+    kind = str(ext_or_mime or "").lower()
+    if kind in ("png", ".png", "image/png"):
+        return raw.startswith(PNG_SIGNATURE)
+    if kind in ("jpg", ".jpg", "jpeg", ".jpeg", "image/jpeg"):
+        return raw.startswith(JPEG_SIGNATURE)
+    return False
+
+
+def _mb(limit):
+    """Human-readable MB value used in the localized size errors."""
+    return max(1, limit // (1024 * 1024))
+
 
 def window_title(ui_language):
     """Native window title for the given UI language (English by default)."""
     language = str(ui_language or "").strip().lower()
     if language == "es":
-        return "CVLaTex — Editor de CV"
+        return "CVLaTeX — Editor de CV"
     if language == "zh":
-        return "CVLaTex — 简历编辑器"
+        return "CVLaTeX — 简历编辑器"
     if language == "ru":
-        return "CVLaTex — Редактор резюме"
-    return "CVLaTex — CV Editor"
+        return "CVLaTeX — Редактор резюме"
+    return "CVLaTeX — CV Editor"
 
 AUTOSAVE_FILE = "autosave.cvjson"
 # The restore point is written atomically: `<file>.tmp` is flushed and fsynced
@@ -74,7 +148,7 @@ AUTOSAVE_TMP_FILE = AUTOSAVE_FILE + ".tmp"
 AUTOSAVE_BAK_FILE = AUTOSAVE_FILE + ".bak"
 CACHE_MAX_AGE_DAYS = 30
 MEDIA_EXTS = (".jpg", ".jpeg", ".png")
-MEDIA_FIELDS = ("photo", "photo_original", "photo_crop", "school_logo")
+MEDIA_FIELDS = ("photo", "photo_original", "photo_crop", "school_logo", "school_logo_original")
 LOGO_FIELDS = ("work", "internships", "projects", "university_projects", "education")
 
 
@@ -89,9 +163,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def end_headers(self):
         """Add the security headers to every response, including errors."""
+        path = self._request_path()
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Content-Security-Policy", _csp_for(path))
+        self.send_header("X-Frame-Options", _frame_option_for(path))
+        self.send_header("Permissions-Policy", PERMISSIONS_POLICY)
+        self.send_header("Cross-Origin-Resource-Policy", "same-origin")
         if self._set_session_cookie:
             self.send_header(
                 "Set-Cookie",
@@ -327,6 +406,12 @@ class Api:
     def init(self):
         current = prefs.load()
         latex_path = latex_engine.find_pdflatex()
+        if latex_path and current.get("latex_path") != latex_path:
+            try:
+                prefs.set("latex_path", latex_path)
+                current = prefs.load()
+            except OSError:
+                pass
         return {
             "prefs": current,
             "latex_ok": latex_path is not None,
@@ -398,6 +483,14 @@ class Api:
             ext = os.path.splitext(path)[1].lower()
             if ext not in latex_engine.ALLOWED_PHOTOS:
                 return {"ok": False, "error": messages.t("export_bad_format")}
+            if os.path.getsize(path) > MAX_IMAGE_BYTES:
+                return {
+                    "ok": False,
+                    "error": messages.t("image_too_large").format(size=_mb(MAX_IMAGE_BYTES)),
+                }
+            with open(path, "rb") as f:
+                if not _image_matches(f.read(8), ext):
+                    return {"ok": False, "error": messages.t("image_invalid_content")}
             os.makedirs(prefs.CACHE_DIR, exist_ok=True)
             name = "%s_%s%s" % (prefix, uuid.uuid4().hex, ext)
             destination = os.path.join(prefs.CACHE_DIR, name)
@@ -416,6 +509,10 @@ class Api:
         try:
             if not isinstance(data_url, str):
                 raise ValueError(messages.t("image_invalid_data_url"))
+            if len(data_url) > MAX_DATA_URL_CHARS:
+                raise ValueError(
+                    messages.t("image_too_large").format(size=_mb(MAX_IMAGE_BYTES))
+                )
             match = re.fullmatch(
                 r"data:(image/(?:png|jpeg));base64,([A-Za-z0-9+/]*={0,2})",
                 data_url,
@@ -426,6 +523,12 @@ class Api:
             image_bytes = base64.b64decode(b64, validate=True)
             if not image_bytes:
                 raise ValueError(messages.t("image_empty"))
+            if len(image_bytes) > MAX_IMAGE_BYTES:
+                raise ValueError(
+                    messages.t("image_too_large").format(size=_mb(MAX_IMAGE_BYTES))
+                )
+            if not _image_matches(image_bytes, mime):
+                raise ValueError(messages.t("image_invalid_content"))
             prefix = kind if kind in ("foto", "logo", "recorte") else "foto"
             ext = ".png" if mime == "image/png" else ".jpg"
             os.makedirs(prefs.CACHE_DIR, exist_ok=True)
@@ -503,7 +606,7 @@ class Api:
                 suggested = "mi_cv.cvjson"
                 if data.get("name"):
                     suggested = "%s.cvjson" % data["name"].strip().replace(" ", "_")
-                target = self.choose_file(("CVLaTex (*.cvjson)",), True, suggested)
+                target = self.choose_file(("CVLaTeX (*.cvjson)",), True, suggested)
                 if not target:
                     return {"ok": False, "cancelado": True}
             content = {
@@ -511,17 +614,32 @@ class Api:
                 "data": data,
                 "media": collect_media(data, self._media_cache),
             }
+            payload = json.dumps(content, ensure_ascii=False, indent=2)
+            if len(payload.encode("utf-8")) > MAX_CVJSON_BYTES:
+                return {
+                    "ok": False,
+                    "errores": [
+                        messages.t("file_too_large").format(size=_mb(MAX_CVJSON_BYTES))
+                    ],
+                }
             with open(target, "w", encoding="utf-8") as f:
-                json.dump(content, f, ensure_ascii=False, indent=2)
+                f.write(payload)
             return {"ok": True, "ruta": target}
         except OSError as e:
             return {"ok": False, "errores": [str(e)]}
 
     def open_cv(self):
-        path = self.choose_file(("CVLaTex (*.cvjson)",), False, None)
+        path = self.choose_file(("CVLaTeX (*.cvjson)",), False, None)
         if not path:
             return {"ok": False, "cancelado": True}
         try:
+            if os.path.getsize(path) > MAX_CVJSON_BYTES:
+                return {
+                    "ok": False,
+                    "errores": [
+                        messages.t("file_too_large").format(size=_mb(MAX_CVJSON_BYTES))
+                    ],
+                }
             with open(path, "r", encoding="utf-8") as f:
                 content = json.load(f)
             data, media = read_cvjson(content, path)
@@ -557,8 +675,16 @@ class Api:
                 "data": data,
                 "media": collect_media(data, self._media_cache),
             }
+            payload = json.dumps(content, ensure_ascii=False)
+            if len(payload.encode("utf-8")) > MAX_CVJSON_BYTES:
+                return {
+                    "ok": False,
+                    "errores": [
+                        messages.t("file_too_large").format(size=_mb(MAX_CVJSON_BYTES))
+                    ],
+                }
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(content, f, ensure_ascii=False)
+                f.write(payload)
                 f.flush()
                 os.fsync(f.fileno())
             if os.path.isfile(target):
@@ -580,6 +706,8 @@ class Api:
     def _read_autosave_file(self, path):
         """Plain data of one autosave file, or None. Never raises."""
         try:
+            if os.path.getsize(path) > MAX_CVJSON_BYTES:
+                return None
             with open(path, "r", encoding="utf-8") as f:
                 content = json.load(f)
             if not isinstance(content, dict):
@@ -641,7 +769,7 @@ class Api:
             try:
                 data = tex_datos.extract(tex)
             except tex_datos.MissingDataBlock:
-                if "CVLaTex" in tex or "CVLaTeX" in tex:
+                if "CVLaTeX" in tex or "CVLaTex" in tex:
                     msg = messages.t("import_no_data")
                 else:
                     msg = messages.t("import_incompatible")
@@ -665,6 +793,22 @@ class Api:
         threading.Thread(target=self._install_thread, args=(cancel_event,), daemon=True).start()
         return "ok"
 
+    def install_latex_from_file(self):
+        """Install a TinyTeX archive the user downloaded with a manager."""
+        path = self.choose_file(
+            ("TinyTeX archive (*.zip;*.tar.gz;*.tgz;*.tar.xz)",), False, None
+        )
+        if not path:
+            return {"ok": False, "cancelado": True}
+        self._cancel_event = threading.Event()
+        cancel_event = self._cancel_event
+        threading.Thread(
+            target=self._install_from_file_thread,
+            args=(path, cancel_event),
+            daemon=True,
+        ).start()
+        return "ok"
+
     def cancel_install(self):
         """Abort the in-flight TinyTeX install, if any."""
         cancel_event = self._cancel_event
@@ -674,6 +818,22 @@ class Api:
         return {"ok": True}
 
     def _install_thread(self, cancel_event):
+        self._run_install(
+            lambda progress, event, warn: latex_engine.install_tinytex(
+                progress, event, warn
+            ),
+            cancel_event,
+        )
+
+    def _install_from_file_thread(self, path, cancel_event):
+        self._run_install(
+            lambda progress, event, warn: latex_engine.install_from_archive(
+                path, progress, event, warn
+            ),
+            cancel_event,
+        )
+
+    def _run_install(self, installer, cancel_event):
         warnings = []
 
         def progress(done, total):
@@ -686,7 +846,7 @@ class Api:
             self._push("__onInstallProgress", {"warning": message})
 
         try:
-            path = latex_engine.install_tinytex(progress, cancel_event, warn)
+            path = installer(progress, cancel_event, warn)
             result = {"ok": True, "msg": messages.t("install_done"), "path": path}
             if warnings:
                 result["warning"] = " ".join(dict.fromkeys(warnings))
@@ -704,11 +864,23 @@ class Api:
         if not path:
             return {"ok": False, "cancelado": True}
         prefs.set("latex_path", path)
+        latex_engine.reset_engine_cache()
         return {"ok": True, "path": path}
 
     def check_latex(self):
         path = latex_engine.find_pdflatex()
-        return {"ok": path is not None, "path": path}
+        if path:
+            # Remember where the engine was found so later starts are instant.
+            try:
+                prefs.set("latex_path", path)
+            except OSError:
+                pass
+            return {"ok": True, "path": path}
+        return {
+            "ok": False,
+            "path": None,
+            "diagnostics": latex_engine.pdflatex_diagnostics(),
+        }
 
     def open_preview(self):
         """Open the last compiled PDF with the system default viewer.
@@ -1254,6 +1426,16 @@ def migrate_data(data):
     ):
         data[key] = _migrate_entries(key, data.get(key))
     _migrate_legacy_contacts(data)
+    if not isinstance(data.get("school_logo_original"), str):
+        logo = data.get("school_logo")
+        data["school_logo_original"] = logo if isinstance(logo, str) else ""
+    if not isinstance(data.get("school_logo_crop"), dict):
+        data["school_logo_crop"] = None
+    data["school_logo_side"] = (
+        "right"
+        if str(data.get("school_logo_side", "")).strip().lower() == "right"
+        else "left"
+    )
     data["socials"] = sanitize_socials(data.get("socials"))
     if "columns" in data:
         data["columns"] = _migrate_columns(data.get("columns"))
@@ -1332,6 +1514,7 @@ def collect_media(data, cache=None):
                 value = entry.get("logo")
                 if isinstance(value, str) and value:
                     candidates.append(value)
+    total_b64 = 0
     for path in candidates:
         if path in media:
             continue
@@ -1339,19 +1522,30 @@ def collect_media(data, cache=None):
         if ext not in MEDIA_EXTS or not os.path.isfile(path):
             continue
         try:
-            cache_key = (path, os.path.getmtime(path), os.path.getsize(path))
+            size = os.path.getsize(path)
+            cache_key = (path, os.path.getmtime(path), size)
         except OSError:
+            continue
+        if size > MAX_MEDIA_BYTES:
             continue
         entry = cache.get(cache_key) if cache is not None else None
         if entry is None:
             try:
                 with open(path, "rb") as f:
-                    b64 = base64.b64encode(f.read()).decode("ascii")
+                    raw = f.read()
             except OSError:
                 continue
-            entry = {"name": os.path.basename(path), "b64": b64}
+            if not _image_matches(raw, ext):
+                continue
+            entry = {
+                "name": os.path.basename(path),
+                "b64": base64.b64encode(raw).decode("ascii"),
+            }
             if cache is not None:
                 cache[cache_key] = entry
+        if total_b64 + len(entry["b64"]) > MAX_MEDIA_TOTAL_BYTES * 4 // 3:
+            continue
+        total_b64 += len(entry["b64"])
         media[path] = entry
     return media
 
@@ -1383,23 +1577,30 @@ def materialize_media(data, media):
     except OSError:
         return data
     replacements = {}
+    total = 0
     for original_path, info in media.items():
         if not isinstance(info, dict):
             continue
         b64 = info.get("b64")
         if not isinstance(b64, str):
             continue
-        try:
-            raw = base64.b64decode(b64)
-        except Exception:
-            continue
-        if not raw:
-            continue
         ext = os.path.splitext(str(original_path))[1].lower()
         if ext not in MEDIA_EXTS:
             ext = os.path.splitext(str(info.get("name") or info.get("nombre") or ""))[1].lower()
         if ext not in MEDIA_EXTS:
             ext = ".jpg"
+        if len(b64) > MAX_DATA_URL_CHARS:
+            continue
+        try:
+            raw = base64.b64decode(b64)
+        except Exception:
+            continue
+        if not raw or len(raw) > MAX_MEDIA_BYTES:
+            continue
+        if not _image_matches(raw, ext):
+            continue
+        if total + len(raw) > MAX_MEDIA_TOTAL_BYTES:
+            break
         name = "cv_%s%s" % (uuid.uuid4().hex, ext)
         destination = os.path.join(prefs.CACHE_DIR, name)
         try:
@@ -1407,6 +1608,7 @@ def materialize_media(data, media):
                 f.write(raw)
         except OSError:
             continue
+        total += len(raw)
         replacements[str(original_path)] = destination
     if not replacements:
         return data

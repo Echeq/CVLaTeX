@@ -36,10 +36,11 @@ PDF、Word 或 LaTeX 源码，内置 12 套模板并支持中文简历。无需�
 
 ## Demo
 
-[![CVLaTeX short demo](../media/images/demo-poster.png)](../media/videos/demo-en.mp4)
+[![CVLaTeX demo preview](../media/images/demo-preview.gif)](https://github.com/Echeq/CVLaTeX/raw/main/docs/media/videos/demo-en.mp4)
 
-Short 45-second demo: first run, sample CV, logo crop and Chinese template.
-A full 2–3 minute walkthrough is still pending for the final submission.
+Eight-second GIF preview of the 45-second MP4 demo: sample CV, Chinese
+template, photo crop and logo. The full 2–3 minute walkthrough is still pending
+for the final submission.
 
 Demo script and shot list: [`demo-script.md`](demo-script.md).
 

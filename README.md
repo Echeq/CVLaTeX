@@ -6,9 +6,9 @@
 
 ## Demo
 
-[![CVLaTeX demo preview: Chinese CV, photo crop and logo](docs/media/images/demo-preview.gif)](https://github.com/Echeq/CVLaTeX/raw/main/docs/media/videos/demo-en.mp4)
+[![Watch the CVLaTeX demo](docs/media/images/demo-poster.png)](https://echeq.github.io/CVLaTeX/demo.html)
 
-Eight-second preview of the **45-second demo** (MP4, 1.3 MB): sample CV, Chinese template, photo crop and logo. GitHub does not play repository MP4s inline, so the preview is a GIF and the link downloads the full clip. A longer 2–3 minute walkthrough is being prepared for the competition submission.
+**45-second demo** recorded on the v1.0 build: first run, sample CV, Chinese template, photo crop and exports. It opens in the browser with a normal video player. A longer 2–3 minute walkthrough is being prepared for the competition submission.
 
 The recording script and shot list live in
 [`docs/competition/demo-script.md`](docs/competition/demo-script.md). Media

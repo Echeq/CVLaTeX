@@ -36,14 +36,14 @@ def test_readme_links_every_market_guide():
     readme = _read("README.md")
     for market in MARKETS:
         assert "docs/markets/%s.md" % market in readme, market
-    assert "docs/media/videos/demo-en.mp4" in readme
-    assert "docs/media/images/demo-preview.gif" in readme
+    assert "docs/media/images/demo-poster.png" in readme
+    assert "echeq.github.io/CVLaTeX/demo.html" in readme
 
 
 def test_competition_and_media_docs_exist():
     competition = _read("docs", "competition", "README.md")
-    assert "docs/media/videos/demo-en.mp4" in competition
-    assert "../media/images/demo-preview.gif" in competition
+    assert "echeq.github.io/CVLaTeX/demo.html" in competition
+    assert "../media/images/demo-poster.png" in competition
     assert "30 November 2026" in competition
     assert "ossrpp.tcode.com.cn" in competition
     assert "git.hust.edu.cn" in competition
@@ -51,7 +51,7 @@ def test_competition_and_media_docs_exist():
 
 def test_readme_demo_media_files_exist():
     video = os.path.join(ROOT, "docs", "media", "videos", "demo-en.mp4")
-    poster = os.path.join(ROOT, "docs", "media", "images", "demo-preview.gif")
+    poster = os.path.join(ROOT, "docs", "media", "images", "demo-poster.png")
     assert os.path.isfile(video) and os.path.getsize(video) > 100_000
     assert os.path.isfile(poster) and os.path.getsize(poster) > 10_000
 

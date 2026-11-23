@@ -61,11 +61,27 @@ def test_chinese_readme_and_language_switch():
     chinese = _read("README.zh.md")
     assert "[中文](README.zh.md)" in english
     assert "[English](README.md)" in chinese
-    assert "1031" in chinese and "922" in chinese
+    assert "1032" in chinese and "923" in chinese
     assert "https://echeq.github.io/CVLaTeX/demo.html" in chinese
     assert "MIT" in chinese
     competition = _read("docs", "competition", "README.md")
     assert "../../README.zh.md" in competition
+
+
+def test_both_readmes_show_binary_and_python_paths():
+    english = _read("README.md")
+    chinese = _read("README.zh.md")
+    assert english.count("Option A") >= 3
+    assert english.count("Option B") >= 3
+    assert chinese.count("方式 A") >= 3
+    assert chinese.count("方式 B") >= 3
+    for text in (english, chinese):
+        assert "git clone https://github.com/Echeq/CVLaTeX.git" in text
+        assert "requirements.txt" in text
+        assert "main.py" in text
+    for command in ("CVLaTeX.exe", "CVLaTeX.app", "./CVLaTeX"):
+        assert command in english
+        assert command in chinese
 
     media = _read("docs", "media", "README.md")
     assert "[Insert:Image:{" in media

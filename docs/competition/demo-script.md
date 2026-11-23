@@ -45,7 +45,7 @@ video can follow the timing below.
 
 ## 2:05–2:30 — Quality and closing
 
-- Show `File → Settings`, the 1031-test suite and the three-OS CI.
+- Show `File → Settings`, the 1032-test suite and the three-OS CI.
 - Mention MIT license, offline privacy and the TinyTeX on-demand installer.
 - Close on the logo and the repository URL.
 

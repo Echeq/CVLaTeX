@@ -33,27 +33,73 @@ All four files are attached to the [v1.0.1 release](https://github.com/Echeq/CVL
 
 ## Installation
 
+## Installation
+
+There are **two ways to run CVLaTeX** on every platform:
+
+| Platform | Option A: release binary | Option B: Python source |
+| --- | --- | --- |
+| Linux | Download the `.tar.gz`, extract, run `./CVLaTeX` | Clone the repo, create a venv, run `main.py` |
+| Windows | Download the `.zip`, extract, run `CVLaTeX.exe` | Clone the repo, create a venv, run `main.py` |
+| macOS | Download the `.zip`, open `CVLaTeX.app` | Clone the repo, create a venv, run `main.py` |
+
+Every release archive contains the application **plus all the documentation files**: `README.md`, `LICENSE`, `THIRD_PARTY_NOTICES.md`, `CHANGELOG.md` and `SECURITY.md`. Download `SHA256SUMS.txt` too if you want to verify the archive.
+
 For most users: download the archive above, extract it, and run the app. No Python or LaTeX installation is required; the app can install TinyTeX on first run. On first run the language picker asks for the interface language and the app starts with a blank CV; `Edit → Load sample CV` fills it with a fictional example when you want one.
 
 ### Windows
 
-1. Download and extract the `.zip`.
-2. Run `CVLaTeX.exe`.
-3. Windows SmartScreen will warn because the build is unsigned: click **More info → Run anyway**.
-4. WebView2 is required and normally preinstalled on Windows 10/11; if missing, install the [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/).
-5. On first run, let the app install TinyTeX if you want PDF preview/export.
+**Option A — release binary**
+
+1. Download `CVLaTeX-v1.0.1-windows-x64.zip` and `SHA256SUMS.txt`.
+2. Extract the whole `.zip` (the app and all documentation files).
+3. Run `CVLaTeX.exe`.
+4. Windows SmartScreen will warn because the build is unsigned: click **More info → Run anyway**.
+5. WebView2 is required and normally preinstalled on Windows 10/11; if missing, install the [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/).
+6. On first run, let the app install TinyTeX if you want PDF preview/export.
+
+**Option B — Python source**
+
+Requirements: Python 3.12 and Git. LaTeX is optional for PDF preview/export.
+
+```powershell
+git clone https://github.com/Echeq/CVLaTeX.git
+cd CVLaTeX
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\python.exe main.py
+```
 
 ### macOS
 
-1. Download and unzip; drag `CVLaTeX.app` to Applications (optional).
-2. Open it. If Gatekeeper blocks it, right-click the app → **Open**, or use **System Settings → Privacy & Security → Open Anyway**.
-3. This build is **Apple Silicon (arm64) only**; Intel Macs are not supported.
-4. Let the app install TinyTeX if you want PDF preview/export.
+**Option A — release app**
+
+1. Download `CVLaTeX-v1.0.1-macos-arm64.zip` and `SHA256SUMS.txt`.
+2. Unzip it; the folder contains `CVLaTeX.app` and the documentation files.
+3. Drag `CVLaTeX.app` to Applications (optional).
+4. Open it. If Gatekeeper blocks it, right-click the app → **Open**, or use **System Settings → Privacy & Security → Open Anyway**.
+5. This build is **Apple Silicon (arm64) only**; Intel Macs are not supported.
+6. Let the app install TinyTeX if you want PDF preview/export.
+
+**Option B — Python source**
+
+Requirements: Python 3.12 and Git. LaTeX is optional for PDF preview/export.
+
+```bash
+git clone https://github.com/Echeq/CVLaTeX.git
+cd CVLaTeX
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python main.py
+```
 
 ### Linux
 
+**Option A — release binary**
+
 1. Install the runtime packages: Debian/Ubuntu `sudo apt install python3-gi gir1.2-webkit2-4.1`; Arch `sudo pacman -S python-gobject webkit2gtk-4.1`.
-2. Extract and run:
+2. Download `CVLaTeX-v1.0.1-linux-x86_64.tar.gz` and `SHA256SUMS.txt`.
+3. Extract the whole archive and run:
 
    ```bash
    tar -xzf CVLaTeX-v1.0.1-linux-x86_64.tar.gz
@@ -61,39 +107,25 @@ For most users: download the archive above, extract it, and run the app. No Pyth
    ./CVLaTeX
    ```
 
-3. `libwebkit2gtk-4.1-dev` is build-only and not needed to run.
-4. Let the app install TinyTeX if you want PDF preview/export.
+4. `libwebkit2gtk-4.1-dev` is build-only and not needed to run.
+5. Let the app install TinyTeX if you want PDF preview/export.
 
-### From source
+**Option B — Python source**
 
-Linux:
+Requirements: Python 3.12, Git, and the distro PyGObject/WebKitGTK packages.
 
 ```bash
+git clone https://github.com/Echeq/CVLaTeX.git
+cd CVLaTeX
 sudo apt-get install python3-gi gir1.2-webkit2-4.1 python3-venv
 python3 -m venv --system-site-packages .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python main.py
 ```
 
-Add `libwebkit2gtk-4.1-dev` only when building a bundle with `./build.sh`; it is not needed to run from source.
+### From source
 
-macOS:
-
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python main.py
-```
-
-Windows (PowerShell):
-
-```powershell
-python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
-.venv\Scripts\python.exe main.py
-```
-
-On Linux the `--system-site-packages` flag is required so the venv sees the distro PyGObject/WebKitGTK packages; on macOS it is unnecessary. Full setup, test and build instructions are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+The per-platform commands above are the complete source path. On Linux, `--system-site-packages` is required so the venv sees the distro PyGObject/WebKitGTK packages; on macOS and Windows it is unnecessary. Add `libwebkit2gtk-4.1-dev` only when building a bundle with `./build.sh`; it is not needed to run from source. Full setup, test and build instructions are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Releases
 

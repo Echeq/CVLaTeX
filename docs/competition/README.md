@@ -63,7 +63,7 @@ conventions and the closest app settings:
 
 ## Quality evidence
 
-- **1031 tests pass** with a LaTeX engine available (922 in the fast suite);
+- **1032 tests pass** with a LaTeX engine available (923 in the fast suite);
   the PDF compile tests are marked and skip when no engine is installed.
 - **CI on three operating systems:** Windows, Linux and macOS build native
   archives on every push; tagged releases verify the tag, archive contents and

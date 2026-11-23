@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The English and Chinese READMEs now document both supported run paths per
+  platform: download the release binary/archive, or clone the repo and run it
+  from Python with a virtual environment.
+
 ## [1.0.1] - 2026-11-23
 
 ### Fixed

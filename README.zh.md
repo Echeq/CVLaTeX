@@ -19,7 +19,7 @@
 - 内置 12 套模板，包含 6 套中文风格模板，中文内容自动切换 XeLaTeX。
 - 完全离线：无账号、无订阅、无云端上传，简历和照片只保存在本机。
 - 表单化编辑，不需要学习 LaTeX；同时保留 PDF、Word、LaTeX 三种输出。
-- **1031 个测试通过**（其中快速套件 922 个），覆盖数据模型、模板、导出、HTTP 服务、安全与发布流程。
+- **1032 个测试通过**（其中快速套件 923 个），覆盖数据模型、模板、导出、HTTP 服务、安全与发布流程。
 - 本地 HTTP 服务带会话令牌、Host/Origin 校验、CSP 和上传大小限制；TinyTeX 下载使用固定 SHA-256 校验。
 
 ## 下载
@@ -43,27 +43,71 @@
 
 ## 安装
 
-普通用户下载上表中的压缩包，解压后直接运行即可。首次启动会先选择界面语言，然后进入空白简历；需要示例时使用 `Edit → Load sample CV`。
+每个平台都有 **两种运行方式**：
+
+| 平台 | 方式 A：发行包 | 方式 B：Python 源码 |
+| --- | --- | --- |
+| Linux | 下载 `.tar.gz`，解压后运行 `./CVLaTeX` | 克隆仓库，创建虚拟环境，运行 `main.py` |
+| Windows | 下载 `.zip`，解压后运行 `CVLaTeX.exe` | 克隆仓库，创建虚拟环境，运行 `main.py` |
+| macOS | 下载 `.zip`，打开 `CVLaTeX.app` | 克隆仓库，创建虚拟环境，运行 `main.py` |
+
+每个发行包都包含应用程序和**全部文档文件**：`README.md`、`LICENSE`、`THIRD_PARTY_NOTICES.md`、`CHANGELOG.md` 和 `SECURITY.md`。如需校验，请同时下载 `SHA256SUMS.txt`。
+
+普通用户下载对应平台的压缩包，解压后直接运行即可。无需安装 Python 或 LaTeX；如需 PDF，应用可以在首次运行时安装 TinyTeX。首次启动会先选择界面语言，然后进入空白简历；需要示例时使用 `Edit → Load sample CV`。
 
 ### Windows
 
-1. 下载并解压 `.zip`。
-2. 运行 `CVLaTeX.exe`。
-3. 由于构建未签名，SmartScreen 可能提示；点击 **More info → Run anyway**。
-4. 如系统缺少 WebView2，安装 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)。
-5. 如需 PDF 预览/导出，允许应用安装 TinyTeX。
+**方式 A — 发行包**
+
+1. 下载 `CVLaTeX-v1.0.1-windows-x64.zip` 和 `SHA256SUMS.txt`。
+2. 解压整个 `.zip`（包含应用和全部文档）。
+3. 运行 `CVLaTeX.exe`。
+4. 由于构建未签名，SmartScreen 可能提示；点击 **More info → Run anyway**。
+5. 如系统缺少 WebView2，安装 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)。
+6. 如需 PDF 预览/导出，允许应用安装 TinyTeX。
+
+**方式 B — Python 源码**
+
+要求：Python 3.12 和 Git。PDF 预览/导出需要 LaTeX，但可以在应用内安装 TinyTeX。
+
+```powershell
+git clone https://github.com/Echeq/CVLaTeX.git
+cd CVLaTeX
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\python.exe main.py
+```
 
 ### macOS
 
-1. 下载并解压，将 `CVLaTeX.app` 拖入 Applications（可选）。
-2. 打开应用。若 Gatekeeper 阻止，右键 → **Open**，或在 **System Settings → Privacy & Security → Open Anyway** 中允许。
-3. 该构建仅支持 **Apple Silicon（arm64）**，不支持 Intel Mac。
-4. 如需 PDF 预览/导出，允许应用安装 TinyTeX。
+**方式 A — 发行包**
+
+1. 下载 `CVLaTeX-v1.0.1-macos-arm64.zip` 和 `SHA256SUMS.txt`。
+2. 解压后在文件夹中会看到 `CVLaTeX.app` 和全部文档。
+3. 将 `CVLaTeX.app` 拖入 Applications（可选）。
+4. 打开应用。若 Gatekeeper 阻止，右键 → **Open**，或在 **System Settings → Privacy & Security → Open Anyway** 中允许。
+5. 该构建仅支持 **Apple Silicon（arm64）**，不支持 Intel Mac。
+6. 如需 PDF 预览/导出，允许应用安装 TinyTeX。
+
+**方式 B — Python 源码**
+
+要求：Python 3.12 和 Git。PDF 预览/导出需要 LaTeX，但可以在应用内安装 TinyTeX。
+
+```bash
+git clone https://github.com/Echeq/CVLaTeX.git
+cd CVLaTeX
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python main.py
+```
 
 ### Linux
 
+**方式 A — 发行包**
+
 1. 安装运行依赖：Debian/Ubuntu 使用 `sudo apt install python3-gi gir1.2-webkit2-4.1`；Arch 使用 `sudo pacman -S python-gobject webkit2gtk-4.1`。
-2. 解压并运行：
+2. 下载 `CVLaTeX-v1.0.1-linux-x86_64.tar.gz` 和 `SHA256SUMS.txt`。
+3. 解压整个压缩包并运行：
 
    ```bash
    tar -xzf CVLaTeX-v1.0.1-linux-x86_64.tar.gz
@@ -71,37 +115,25 @@
    ./CVLaTeX
    ```
 
-3. `libwebkit2gtk-4.1-dev` 仅构建时需要，运行不需要。
-4. 如需 PDF 预览/导出，允许应用安装 TinyTeX。
+4. `libwebkit2gtk-4.1-dev` 仅构建时需要，运行不需要。
+5. 如需 PDF 预览/导出，允许应用安装 TinyTeX。
 
-### 从源码运行
+**方式 B — Python 源码**
 
-Linux：
+要求：Python 3.12、Git，以及系统的 PyGObject/WebKitGTK 包。
 
 ```bash
+git clone https://github.com/Echeq/CVLaTeX.git
+cd CVLaTeX
 sudo apt-get install python3-gi gir1.2-webkit2-4.1 python3-venv
 python3 -m venv --system-site-packages .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python main.py
 ```
 
-macOS：
+### 从源码运行
 
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python main.py
-```
-
-Windows（PowerShell）：
-
-```powershell
-python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
-.venv\Scripts\python.exe main.py
-```
-
-Linux 使用 `--system-site-packages` 是为了让虚拟环境读取系统的 PyGObject/WebKitGTK；macOS 不需要。完整开发、测试和构建说明见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
+上面的每平台命令就是完整的源码运行方式。Linux 使用 `--system-site-packages` 是为了让虚拟环境读取系统的 PyGObject/WebKitGTK；macOS 和 Windows 不需要。只有用 `./build.sh` 构建发行包时才需要 `libwebkit2gtk-4.1-dev`，从源码运行不需要。完整开发、测试和构建说明见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
 
 ## 版本发布
 

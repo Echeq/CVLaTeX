@@ -1164,75 +1164,51 @@ def _header_modern(doc, d, L, palette, profile):
 
 
 def _header_creative(doc, d, L, palette, profile):
-    """Full-width accent band with the white name, contacts/photo below it."""
+    """Short accent name plate left, media column right, contacts below."""
     total = _text_width_cm(doc)
     logo, photo = _header_images(d)
-    table = _new_header_table(doc, (total,))
-    cell = table.cell(0, 0)
-    _cell_top(cell)
-    _set_cell_margins(cell, top=0, right=0, bottom=0, left=0)
+    has_media = bool(logo or photo)
+    left_width = total * 0.68 if has_media else total
+    right_width = total - left_width
+    widths = (left_width, right_width) if has_media else (total,)
+    table = _new_header_table(doc, widths)
+    left = table.cell(0, 0)
+    _cell_top(left)
+    _set_cell_margins(left, top=40, right=240, bottom=40, left=240)
 
     name = _text(_value(d, "name")) or L["title_short"]
     band_color = palette.role_hex(profile.band_role or "accent")
-    band = docx_shapes.fixed_table(cell, (total,))
-    if band is not None:
-        band_cell = band.cell(0, 0)
-        docx_shapes.shade_cell(band_cell, band_color)
-        _set_cell_margins(band_cell, top=40, right=240, bottom=40, left=240)
-        docx_shapes.exact_row_height(band.rows[0], 1.3, "atLeast")
-        try:
-            band_cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-        except Exception:
-            pass
-        band_paragraph = band_cell.paragraphs[0]
-        _zero_spacing(band_paragraph)
-        _write_name(
-            band_paragraph, name, palette, profile,
-            color=palette.role("white"),
-            max_width_cm=max(total - 0.8, 1.0),
-        )
-        _shrink_empty_paragraphs(cell)
-    else:
-        band_paragraph = cell.paragraphs[0]
-        _zero_spacing(band_paragraph)
-        docx_shapes.shade_paragraph(band_paragraph, band_color)
-        docx_shapes.set_exact_line_height(band_paragraph, 36.85)
-        _write_name(
-            band_paragraph, name, palette, profile,
-            color=palette.role("white"),
-            max_width_cm=max(total - 0.8, 1.0),
-        )
+    docx_shapes.shade_cell(left, band_color)
+    docx_shapes.exact_row_height(table.rows[0], 1.3, "atLeast")
+    try:
+        left.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+    except Exception:
+        pass
+    paragraph = left.paragraphs[0]
+    _zero_spacing(paragraph)
+    _write_name(
+        paragraph, name, palette, profile,
+        color=palette.role("white"),
+        max_width_cm=max(left_width - 0.8, 1.0),
+    )
 
-    photo_width, photo_height = _photo_box_cm(d, profile, total)
-    if logo:
-        logo_width, logo_height = _logo_box_cm(d, profile, photo_width)
-        _add_logo(
-            cell, logo, logo_width, logo_height, WD_ALIGN_PARAGRAPH.RIGHT,
-        )
+    if has_media:
+        right = table.cell(0, 1)
+        _cell_top(right)
+        _set_cell_margins(right, top=0, right=0, bottom=0, left=20)
+        photo_width, photo_height = _photo_box_cm(d, profile, total)
+        if logo:
+            logo_width, logo_height = _logo_box_cm(d, profile, photo_width)
+            _add_logo(
+                right, logo, logo_width, logo_height, WD_ALIGN_PARAGRAPH.RIGHT,
+            )
+        if photo:
+            _add_framed_photo(
+                right, photo, photo_width, photo_height, palette,
+                WD_ALIGN_PARAGRAPH.RIGHT,
+            )
 
-    if photo:
-        right_width = total * 0.32
-        left_width = total * 0.68
-        content = docx_shapes.fixed_table(cell, (left_width, right_width))
-        if content is not None:
-            contacts_cell = content.cell(0, 0)
-            _set_cell_margins(contacts_cell, top=40, right=120, bottom=0, left=0)
-            _add_contacts(contacts_cell, d, L, palette, profile)
-            photo_cell = content.cell(0, 1)
-            _set_cell_margins(photo_cell, top=40, right=20, bottom=0, left=20)
-            docx_shapes.image_frame(photo_cell, palette.gray_hex, 0.5)
-            paragraph = photo_cell.paragraphs[0]
-            try:
-                paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            except Exception:
-                pass
-            _zero_spacing(paragraph)
-            _insert_picture(paragraph, photo, photo_width)
-            _shrink_empty_paragraphs(cell)
-    else:
-        _add_contacts(cell, d, L, palette, profile)
-        _shrink_empty_paragraphs(cell)
-
+    _add_contacts(doc, d, L, palette, profile, before_pt=6.0)
     _header_rule(doc, palette.role_hex("accent"), 1.2, 1)
     _header_rule(doc, palette.role_hex("gray"), 0.4, 0, gap_before_pt=1.6)
 
@@ -1966,7 +1942,7 @@ def _header_tabbed(doc, d, L, palette, profile):
 
 
 def _header_ribbon(doc, d, L, palette, profile):
-    """Blue band with the name and the photo inside it, gold rule, contacts."""
+    """Full-width blue name band; media and contacts on white below it."""
     total = _text_width_cm(doc)
     logo, photo = _header_images(d)
     table = _new_header_table(doc, (total,))
@@ -1980,38 +1956,23 @@ def _header_ribbon(doc, d, L, palette, profile):
     name = _text(_value(d, "name")) or L["title_short"]
     name_pt = _clamp_number(profile.name_pt, 24.0, 10.0, 40.0)
     pad_cm = _em_cm(0.45, name_pt)
-    photo_width, photo_height = _photo_box_cm(d, profile, total)
-    right_width = max(min(photo_width + 0.30, total * 0.40), total * 0.26)
-    left_width = max(total - right_width, 1.0)
     band_color = palette.role_hex("accent")
-    band = docx_shapes.fixed_table(cell, (left_width, right_width))
+    band = docx_shapes.fixed_table(cell, (total,))
     if band is not None:
-        name_cell = band.cell(0, 0)
-        photo_cell = band.cell(0, 1)
-        for band_cell in (name_cell, photo_cell):
-            docx_shapes.shade_cell(band_cell, band_color)
-        _set_cell_margins(name_cell, top=60, right=80, bottom=60, left=_dxa(pad_cm))
-        _set_cell_margins(photo_cell, top=60, right=80, bottom=60, left=40)
+        band_cell = band.cell(0, 0)
+        docx_shapes.shade_cell(band_cell, band_color)
+        _set_cell_margins(band_cell, top=60, right=80, bottom=60, left=_dxa(pad_cm))
         docx_shapes.exact_row_height(band.rows[0], 1.2, "atLeast")
-        for band_cell in (name_cell, photo_cell):
-            try:
-                band_cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-            except Exception:
-                pass
-        paragraph = name_cell.paragraphs[0]
+        try:
+            band_cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+        except Exception:
+            pass
+        paragraph = band_cell.paragraphs[0]
         _zero_spacing(paragraph)
         _write_name(
             paragraph, name, palette, profile, color=palette.role("white"),
-            base_pt=name_pt,
-            max_width_cm=max(left_width - pad_cm - 0.2, 1.0),
+            base_pt=name_pt, max_width_cm=max(total - pad_cm - 0.2, 1.0),
         )
-        if logo:
-            logo_width, logo_height = _logo_box_cm(d, profile, photo_width)
-            _add_logo(photo_cell, logo, logo_width, logo_height, WD_ALIGN_PARAGRAPH.RIGHT)
-        if photo:
-            _add_plain_picture(
-                photo_cell, photo, photo_width, WD_ALIGN_PARAGRAPH.RIGHT,
-            )
     else:
         paragraph = cell.paragraphs[0]
         _zero_spacing(paragraph)
@@ -2023,7 +1984,30 @@ def _header_ribbon(doc, d, L, palette, profile):
         )
 
     _cell_rule(cell, palette.role_hex("accent2"), 2.4, 1, gap_pt=3.0)
-    _add_contacts(cell, d, L, palette, profile, before_pt=6.0)
+    if logo or photo:
+        photo_width, photo_height = _photo_box_cm(d, profile, total)
+        right_width = max(min(photo_width + 0.30, total * 0.40), total * 0.26)
+        left_width = max(total - right_width, 1.0)
+        content = docx_shapes.fixed_table(cell, (left_width, right_width))
+        if content is not None:
+            contacts_cell = content.cell(0, 0)
+            _set_cell_margins(contacts_cell, top=40, right=120, bottom=0, left=0)
+            _add_contacts(contacts_cell, d, L, palette, profile, before_pt=0.0)
+            media_cell = content.cell(0, 1)
+            _set_cell_margins(media_cell, top=40, right=20, bottom=0, left=20)
+            if logo:
+                logo_width, logo_height = _logo_box_cm(d, profile, photo_width)
+                _add_logo(
+                    media_cell, logo, logo_width, logo_height,
+                    WD_ALIGN_PARAGRAPH.RIGHT,
+                )
+            if photo:
+                _add_plain_picture(
+                    media_cell, photo, photo_width, WD_ALIGN_PARAGRAPH.RIGHT,
+                )
+            _shrink_empty_paragraphs(cell)
+    else:
+        _add_contacts(cell, d, L, palette, profile, before_pt=6.0)
 
 
 def _blade_tip(cell, width_cm, height_cm, color_hex, steps=12):

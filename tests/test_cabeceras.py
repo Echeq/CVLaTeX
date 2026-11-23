@@ -360,6 +360,62 @@ def test_harvard_is_designed_without_a_photo(tmp_path, prefs_tmp):
     assert "foto.png" not in tex
 
 
+def _header_with_media(template, tmp_path):
+    d = datos_contactos("es", template)
+    logo = tmp_path / "logo.png"
+    logo.write_bytes(b"\x89PNG\r\n\x1a\n")
+    photo = tmp_path / "photo.png"
+    photo.write_bytes(b"\x89PNG\r\n\x1a\n")
+    d["school_logo"] = str(logo)
+    d["school_logo_side"] = "right"
+    d["photo"] = str(photo)
+    return d
+
+
+def test_tabbed_media_shares_the_name_row(tmp_path, prefs_tmp):
+    d = _header_with_media("tabbed", tmp_path)
+    body = latex_gen.build_tex(d, prefs.load())
+    body = body[body.index("\\begin{document}"):]
+
+    first_row = body.index("\\begin{minipage}[t]{0.7\\textwidth}")
+    assert first_row < body.index("\\cvfitname{")
+    assert first_row < body.index("logo_egresado.png")
+    assert body.index("logo_egresado.png") < body.index("foto.png")
+
+
+def test_ribbon_keeps_the_media_on_white_below_the_band(tmp_path, prefs_tmp):
+    d = _header_with_media("ribbon", tmp_path)
+    body = latex_gen.build_tex(d, prefs.load())
+    body = body[body.index("\\begin{document}"):]
+
+    gold_rule = body.index("{\\color{acento2}\\hrule height 2.4pt}")
+    assert gold_rule < body.index("logo_egresado.png")
+    assert gold_rule < body.index("foto.png")
+
+
+def test_creative_cuts_the_name_band_for_the_media_column(tmp_path, prefs_tmp):
+    d = _header_with_media("creative", tmp_path)
+    body = latex_gen.build_tex(d, prefs.load())
+    body = body[body.index("\\begin{document}"):]
+
+    assert "\\dimexpr0.68\\textwidth-2\\fboxsep" in body
+    assert body.index("logo_egresado.png") < body.index("\\hrule height 1.2pt")
+
+
+def test_harvard_uses_a_compact_centered_header(tmp_path, prefs_tmp):
+    d = _header_with_media("harvard", tmp_path)
+    body = latex_gen.build_tex(d, prefs.load())
+    body = body[body.index("\\begin{document}"):]
+
+    assert "\\begingroup\\centering" in body
+    assert "\\begin{center}" not in body
+    # The logo is not followed by the old 0.5em gap before the centred name.
+    logo = body.index("logo_egresado.png")
+    name = body.index("\\cvfitname{")
+    assert logo < name
+    assert "\\vspace{0.15em}" in body[logo:name]
+
+
 def test_sidebar_school_logo_is_at_the_top_of_the_bar(tmp_path, prefs_tmp):
     d = datos_contactos("es", "sidebar")
     logo = tmp_path / "logo.png"

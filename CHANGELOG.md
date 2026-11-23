@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Tabbed now starts the logo/photo media column on the same row as the name.
+- Blue ribbon keeps the blue band for the name only; logo and photo sit on the
+  white area below it, next to the contacts.
+- Creative shortens the red name plate to 0.68 text width when media is present,
+  leaving the top-right column for the school logo and photo.
+- Harvard uses a compact centred header and a smaller logo gap instead of the
+  large blank strip above the name.
 - The README demo is encoded at 720p/30 fps and opens in a real HTML5 video
   player on GitHub Pages (`docs/demo.html`); GitHub does not play repository
   MP4s inline. The original 1080p recording stays outside the repository.

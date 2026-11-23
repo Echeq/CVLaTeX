@@ -445,7 +445,7 @@ def _clamp_cm(value, default, low, high):
 
 
 def _school_logo_block(d, width_cm=None, height_cm=None, center=False, side="left",
-                       max_width=6.0, max_height=3.0):
+                       max_width=6.0, max_height=3.0, gap="0.5em"):
     """Letterhead logo for the chosen top corner, or "".
 
     The frontend lets the user set the logo size in cm. The width/height are
@@ -467,10 +467,10 @@ def _school_logo_block(d, width_cm=None, height_cm=None, center=False, side="lef
         f"keepaspectratio]{{logo_egresado{ext}}}"
     )
     if center:
-        return "{\\centering " + box + "\\par}\n\\vspace{0.5em}\n"
+        return "{\\centering " + box + "\\par}\n\\vspace{" + gap + "}\n"
     if side == "right":
-        return "{\\raggedleft " + box + "\\par}\n\\vspace{0.5em}\n"
-    return "\\noindent " + box + "\\par\n\\vspace{0.5em}\n"
+        return "{\\raggedleft " + box + "\\par}\n\\vspace{" + gap + "}\n"
+    return "\\noindent " + box + "\\par\n\\vspace{" + gap + "}\n"
 
 
 def _contact_groups(d, L, on_dark=False):
@@ -621,7 +621,7 @@ def _header_classic(d, L, parts):
 def _header_harvard(d, L, parts):
     name = _display_name(d, L)
     lines = [
-        "\\begin{center}\n",
+        "\\begingroup\\centering\n",
         f"  {{\\LARGE\\scshape\\cvfitname{{{name}}}}}\\par\n",
     ]
     contact = _contacts(d, L)
@@ -631,7 +631,7 @@ def _header_harvard(d, L, parts):
     if parts:
         lines.append("  \\vspace{0.5em}\n")
         lines.extend("  " + p for p in parts)
-    lines.append("\\end{center}\n")
+    lines.append("\\par\\endgroup\n")
     lines.append("\\vspace{0.15em}\n{\\color{gris}\\hrule height 0.5pt}\n")
     lines.append("\\vspace{0.25em}\n{\\color{gris}\\hrule height 0.25pt}\n")
     return "".join(lines)
@@ -668,35 +668,45 @@ def _header_modern(d, L, parts):
 
 def _header_creative(d, L, parts):
     name = _display_name(d, L)
-    band = (
-        "\\noindent\\colorbox{accent}{%\n"
-        "\\begin{minipage}{\\dimexpr\\textwidth-2\\fboxsep\\relax}\n"
-        "\\vspace{0.6em}\n"
-        f"{{\\color{{white}}\\Huge\\bfseries\\cvfitname{{{name}}}}}\\par\n"
-        "\\vspace{0.6em}\n"
-        "\\end{minipage}}\n"
-    )
     contact = _contacts(d, L)
     if parts:
-        blocks = (
+        # The red name plate stops at 0.68 text width; the reserved media
+        # column to its right holds the school logo/photo on white.
+        band = (
+            "\\noindent\\colorbox{accent}{%\n"
+            "\\begin{minipage}{\\dimexpr0.68\\textwidth-2\\fboxsep\\relax}\n"
             "\\vspace{0.6em}\n"
+            f"{{\\color{{white}}\\Huge\\bfseries\\cvfitname{{{name}}}}}\\par\n"
+            "\\vspace{0.6em}\n"
+            "\\end{minipage}}\n"
+        )
+        blocks = (
             "\\noindent\n"
             "\\begin{minipage}[t]{0.68\\textwidth}\n\\vspace{0pt}\n"
-            f"{contact}\n"
-            "\\end{minipage}%\n"
+            + band
+            + "\\end{minipage}%\n"
             "\\hfill\n"
             "\\begin{minipage}[t]{0.28\\textwidth}\n\\vspace{0pt}\n"
             "\\raggedleft\n"
             + "".join(parts)
             + "\\end{minipage}\n"
         )
-    elif contact:
-        blocks = "\\vspace{0.6em}\n" + contact + "\n"
+        if contact:
+            blocks += "\\vspace{0.5em}\n" + contact + "\n"
     else:
-        blocks = ""
+        band = (
+            "\\noindent\\colorbox{accent}{%\n"
+            "\\begin{minipage}{\\dimexpr\\textwidth-2\\fboxsep\\relax}\n"
+            "\\vspace{0.6em}\n"
+            f"{{\\color{{white}}\\Huge\\bfseries\\cvfitname{{{name}}}}}\\par\n"
+            "\\vspace{0.6em}\n"
+            "\\end{minipage}}\n"
+        )
+        blocks = band
+        if contact:
+            blocks += "\\vspace{0.6em}\n" + contact + "\n"
     return (
-        band
-        + blocks
+        blocks
         + "\\vspace{0.4em}\n"
         + "{\\color{accent}\\hrule height 1.2pt}\n"
         + "\\vspace{0.15em}\n"
@@ -853,6 +863,8 @@ def _header_tabbed(d, L, parts):
             "\\noindent\n"
             "\\begin{minipage}[t]{0.7\\textwidth}\n\\vspace{0pt}\n"
             "\\raggedright\n"
+            + headline
+            + "\\vspace{0.3em}\n"
             + "".join(left)
             + "\\end{minipage}%\n"
             "\\hfill\n"
@@ -861,12 +873,17 @@ def _header_tabbed(d, L, parts):
             + "".join(parts)
             + "\\end{minipage}\n"
         )
-    else:
-        row = "\\noindent\n" + "".join(left)
+        return (
+            row
+            + "\\vspace{0.55em}\n"
+            + "{\\color{accent}\\hrule height 2.2pt}\n"
+            + "\\vspace{0.12em}\n"
+            + "{\\color{acento2}\\hrule height 0.6pt}\n"
+        )
     return (
         headline
         + "\\vspace{0.3em}\n"
-        + row
+        + "".join(left)
         + "\\vspace{0.55em}\n"
         + "{\\color{accent}\\hrule height 2.2pt}\n"
         + "\\vspace{0.12em}\n"
@@ -890,41 +907,44 @@ def _header_ribbon(d, L, parts):
         " \\cvfitname{" + name + "}\\par}\n"
         "\\vspace{0.45em}\n"
     )
-    if parts:
-        # The band wraps a full-\linewidth minipage, so it always matches the
-        # gold rule and the text block. The inner columns keep a 0.04 gap;
-        # [c] keeps the name optically centred against a tall photo
-        # (a [t] variant pushed all the leftover blue below the text instead).
-        band = (
-            "\\noindent\\begingroup\\setlength{\\fboxsep}{0pt}%\n"
-            "\\colorbox{accent}{%\n"
-            "\\begin{minipage}{\\linewidth}\n"
-            "\\begin{minipage}[c]{0.7\\linewidth}\n"
+    # The band always spans the full text block and contains only the name.
+    # Photos/logo stay on the white area below it, next to the contacts, so
+    # they never sit inside the blue name band.
+    band = (
+        "\\noindent\\begingroup\\setlength{\\fboxsep}{0pt}%\n"
+        "\\colorbox{accent}{%\n"
+        "\\begin{minipage}[c]{\\linewidth}\n"
+        "\\raggedright\n"
+        + band_left
+        + "\\end{minipage}%\n"
+        "}\n"
+        "\\endgroup\\par\n"
+    )
+    out = band + "\\vspace{0.2em}\n{\\color{acento2}\\hrule height 2.4pt}\n"
+    if parts and contact:
+        out += (
+            "\\vspace{0.5em}\n"
+            "\\noindent\n"
+            "\\begin{minipage}[t]{0.68\\textwidth}\n\\vspace{0pt}\n"
             "\\raggedright\n"
-            + band_left
-            + "\\end{minipage}%\n"
+            + contact
+            + "\n\\end{minipage}%\n"
             "\\hfill\n"
-            "\\begin{minipage}[c]{0.26\\linewidth}\n"
+            "\\begin{minipage}[t]{0.28\\textwidth}\n\\vspace{0pt}\n"
             "\\raggedleft\n"
             + "".join(parts)
-            + "\\end{minipage}%\n"
-            "\\end{minipage}%\n"
-            "}\n"
-            "\\endgroup\\par\n"
+            + "\\end{minipage}\n"
         )
-    else:
-        band = (
-            "\\noindent\\begingroup\\setlength{\\fboxsep}{0pt}%\n"
-            "\\colorbox{accent}{%\n"
-            "\\begin{minipage}[c]{\\linewidth}\n"
-            "\\raggedright\n"
-            + band_left
-            + "\\end{minipage}%\n"
-            "}\n"
-            "\\endgroup\\par\n"
+    elif parts:
+        out += (
+            "\\vspace{0.5em}\n"
+            "\\noindent\\hfill\n"
+            "\\begin{minipage}[t]{0.28\\textwidth}\n\\vspace{0pt}\n"
+            "\\raggedleft\n"
+            + "".join(parts)
+            + "\\end{minipage}\n"
         )
-    out = band + "\\vspace{0.2em}\n{\\color{acento2}\\hrule height 2.4pt}\n"
-    if contact:
+    elif contact:
         out += "\\vspace{0.5em}\n" + contact + "\n"
     return out
 
@@ -1202,7 +1222,7 @@ def _header(d, L, template_name="classic"):
     if template_name in ("sidebar", "sidebar-right"):
         return _header_sidebar(d, L, parts)
     if template_name == "harvard":
-        return _school_logo_block(d, side=side) + _header_harvard(d, L, parts)
+        return _school_logo_block(d, side=side, gap="0.15em") + _header_harvard(d, L, parts)
     if template_name == "modern":
         content = _header_modern(d, L, parts)
     elif template_name == "creative":

@@ -61,7 +61,7 @@ def test_chinese_readme_and_language_switch():
     chinese = _read("README.zh.md")
     assert "[中文](README.zh.md)" in english
     assert "[English](README.md)" in chinese
-    assert "1027" in chinese and "918" in chinese
+    assert "1031" in chinese and "922" in chinese
     assert "https://echeq.github.io/CVLaTeX/demo.html" in chinese
     assert "MIT" in chinese
     competition = _read("docs", "competition", "README.md")

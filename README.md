@@ -1,5 +1,7 @@
 # CVLaTeX
 
+**English** | [中文](README.zh.md)
+
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 > Cross-platform desktop editor (Windows, Linux, macOS) for building a CV in a form, rendering it with LaTeX templates and compiling it to PDF with a live preview. It also exports Word (.docx) and LaTeX (.tex), and saves or loads projects as `.cvjson`.

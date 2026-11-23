@@ -55,6 +55,18 @@ def test_readme_demo_media_files_exist():
     assert os.path.isfile(video) and os.path.getsize(video) > 100_000
     assert os.path.isfile(poster) and os.path.getsize(poster) > 10_000
 
+
+def test_chinese_readme_and_language_switch():
+    english = _read("README.md")
+    chinese = _read("README.zh.md")
+    assert "[中文](README.zh.md)" in english
+    assert "[English](README.md)" in chinese
+    assert "1027" in chinese and "918" in chinese
+    assert "https://echeq.github.io/CVLaTeX/demo.html" in chinese
+    assert "MIT" in chinese
+    competition = _read("docs", "competition", "README.md")
+    assert "../../README.zh.md" in competition
+
     media = _read("docs", "media", "README.md")
     assert "[Insert:Image:{" in media
     assert "[Insert:Video:{" in media

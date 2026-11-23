@@ -1,5 +1,7 @@
 # Competition package — 2026 HUST Excellent Open Source Project
 
+> 中文项目说明：[README.zh.md](../../README.zh.md) · English: [README.md](../../README.md)
+
 Working notes and submission material for the **2026 年华中科技大学优秀开源项目
 征集与评选** (HUST Excellent Open Source Project).
 
@@ -89,7 +91,7 @@ conventions and the closest app settings:
 
 ## Quality evidence
 
-- **1026 tests pass** with a LaTeX engine available (917 in the fast suite);
+- **1027 tests pass** with a LaTeX engine available (918 in the fast suite);
   the PDF compile tests are marked and skip when no engine is installed.
 - **CI on three operating systems:** Windows, Linux and macOS build native
   archives on every push; tagged releases verify the tag, archive contents and

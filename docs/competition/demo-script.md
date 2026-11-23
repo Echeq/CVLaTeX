@@ -50,7 +50,7 @@ video should still be 2:30–3:00.
 
 ## 2:05–2:30 — Quality and closing
 
-- Show `File → Settings`, the 1026-test suite and the three-OS CI.
+- Show `File → Settings`, the 1027-test suite and the three-OS CI.
 - Mention MIT license, offline privacy and the TinyTeX on-demand installer.
 - Close on the logo and the repository URL.
 

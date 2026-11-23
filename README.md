@@ -33,8 +33,6 @@ All four files are attached to the [v1.0.1 release](https://github.com/Echeq/CVL
 
 ## Installation
 
-## Installation
-
 There are **two ways to run CVLaTeX** on every platform:
 
 | Platform | Option A: release binary | Option B: Python source |

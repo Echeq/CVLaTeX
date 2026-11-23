@@ -10,7 +10,7 @@
 
 [![观看 CVLaTeX 演示](docs/media/images/demo-poster.png)](https://echeq.github.io/CVLaTeX/demo.html)
 
-**45 秒演示**（基于 v1.0 构建）：首次启动、示例简历、中文模板、照片裁剪与导出。点击图片即可在浏览器中播放。
+**45 秒演示**（基于 v1.0.1 构建）：首次启动、示例简历、中文模板、照片裁剪与导出。点击图片即可在浏览器中播放。
 
 ## 项目亮点（评审速览）
 
@@ -28,12 +28,12 @@
 
 | 平台 | 下载 |
 | --- | --- |
-| Windows x64 | [CVLaTeX-v1.0.0-windows-x64.zip](https://github.com/Echeq/CVLaTex/releases/download/v1.0.0/CVLaTeX-v1.0.0-windows-x64.zip) |
-| macOS Apple Silicon（arm64） | [CVLaTeX-v1.0.0-macos-arm64.zip](https://github.com/Echeq/CVLaTex/releases/download/v1.0.0/CVLaTeX-v1.0.0-macos-arm64.zip) |
-| Linux x86_64 | [CVLaTeX-v1.0.0-linux-x86_64.tar.gz](https://github.com/Echeq/CVLaTex/releases/download/v1.0.0/CVLaTeX-v1.0.0-linux-x86_64.tar.gz) |
-| 校验和 | [SHA256SUMS.txt](https://github.com/Echeq/CVLaTex/releases/download/v1.0.0/SHA256SUMS.txt) |
+| Windows x64 | [CVLaTeX-v1.0.1-windows-x64.zip](https://github.com/Echeq/CVLaTex/releases/download/v1.0.1/CVLaTeX-v1.0.1-windows-x64.zip) |
+| macOS Apple Silicon（arm64） | [CVLaTeX-v1.0.1-macos-arm64.zip](https://github.com/Echeq/CVLaTex/releases/download/v1.0.1/CVLaTeX-v1.0.1-macos-arm64.zip) |
+| Linux x86_64 | [CVLaTeX-v1.0.1-linux-x86_64.tar.gz](https://github.com/Echeq/CVLaTex/releases/download/v1.0.1/CVLaTeX-v1.0.1-linux-x86_64.tar.gz) |
+| 校验和 | [SHA256SUMS.txt](https://github.com/Echeq/CVLaTex/releases/download/v1.0.1/SHA256SUMS.txt) |
 
-以上文件均附在 [v1.0.0 发行版](https://github.com/Echeq/CVLaTex/releases/tag/v1.0.0) 中。**v1.0.0 是首个正式稳定版**，也是首个使用 `CVLaTeX` 资源命名的版本；v0.3.0 为最后一个预发布版。macOS 仅支持 Apple Silicon，不支持 Intel Mac。
+以上文件均附在 [v1.0.1 发行版](https://github.com/Echeq/CVLaTex/releases/tag/v1.0.1) 中。**v1.0.1 是最新稳定补丁版**；v1.0.0 是首个正式稳定版，v0.3.0 为最后一个预发布版。macOS 仅支持 Apple Silicon，不支持 Intel Mac。
 
 ## 系统要求
 
@@ -66,7 +66,7 @@
 2. 解压并运行：
 
    ```bash
-   tar -xzf CVLaTeX-v1.0.0-linux-x86_64.tar.gz
+   tar -xzf CVLaTeX-v1.0.1-linux-x86_64.tar.gz
    chmod +x CVLaTeX
    ./CVLaTeX
    ```
@@ -105,16 +105,16 @@ Linux 使用 `--system-site-packages` 是为了让虚拟环境读取系统的 Py
 
 ## 版本发布
 
-**v1.0.0 是首个正式稳定版。** 下载文件见上方，也附在 [v1.0.0 发行版](https://github.com/Echeq/CVLaTex/releases/tag/v1.0.0) 中。历史版本：v0.1.0 手动上传；v0.2.0 首次由发布工作流生成；v0.2.1 修复 Linux 启动问题；v0.3.0 为最后一个预发布版。
+**v1.0.1 是最新稳定版。** 下载文件见上方，也附在 [v1.0.1 发行版](https://github.com/Echeq/CVLaTex/releases/tag/v1.0.1) 中。v1.0.0 是首个正式稳定版；v0.3.0 为最后一个预发布版。
 
 | 平台 | 架构 | 文件 |
 | --- | --- | --- |
-| Windows | x64 | `CVLaTeX-v1.0.0-windows-x64.zip`（内含 `CVLaTeX.exe`） |
-| Linux | x86_64 | `CVLaTeX-v1.0.0-linux-x86_64.tar.gz`（内含 `CVLaTeX`） |
-| macOS | Apple Silicon（arm64） | `CVLaTeX-v1.0.0-macos-arm64.zip`（内含 `CVLaTeX.app`） |
+| Windows | x64 | `CVLaTeX-v1.0.1-windows-x64.zip`（内含 `CVLaTeX.exe`） |
+| Linux | x86_64 | `CVLaTeX-v1.0.1-linux-x86_64.tar.gz`（内含 `CVLaTeX`） |
+| macOS | Apple Silicon（arm64） | `CVLaTeX-v1.0.1-macos-arm64.zip`（内含 `CVLaTeX.app`） |
 | 全平台 | — | `SHA256SUMS.txt` |
 
-GitHub 的 `macos-latest` 运行器目前原生构建 Apple Silicon 版本，因此 v1.0.0 的 macOS 文件为 `CVLaTeX-v1.0.0-macos-arm64.zip`；不提供通用二进制或 Intel macOS 构建。
+GitHub 的 `macos-latest` 运行器目前原生构建 Apple Silicon 版本，因此 v1.0.1 的 macOS 文件为 `CVLaTeX-v1.0.1-macos-arm64.zip`；不提供通用二进制或 Intel macOS 构建。
 
 校验下载文件（Linux/macOS，将文件和 `SHA256SUMS.txt` 放在同一目录）：
 
@@ -285,7 +285,7 @@ node --check web/app.js
 node --check web/i18n.js
 ```
 
-在 Linux/macOS 上用 `./build.sh`，Windows 上用 `build.bat` 构建发行包。脚本会先暂存公共资源，运行 PyInstaller，再调用 `tools/package_release.py`，生成 `dist/CVLaTeX-v1.0.0-linux-x86_64.tar.gz`、`dist/CVLaTeX-v1.0.0-macos-arm64.zip` 和 `dist/CVLaTeX-v1.0.0-windows-x64.zip`。原始 `dist/CVLaTeX_Linux`、`dist/CVLaTeX.app` 和 `dist/CVLaTeX.exe` 可用于本地运行。
+在 Linux/macOS 上用 `./build.sh`，Windows 上用 `build.bat` 构建发行包。脚本会先暂存公共资源，运行 PyInstaller，再调用 `tools/package_release.py`，生成 `dist/CVLaTeX-v1.0.1-linux-x86_64.tar.gz`、`dist/CVLaTeX-v1.0.1-macos-arm64.zip` 和 `dist/CVLaTeX-v1.0.1-windows-x64.zip`。原始 `dist/CVLaTeX_Linux`、`dist/CVLaTeX.app` 和 `dist/CVLaTeX.exe` 可用于本地运行。
 
 完整的跨平台环境、架构、测试策略，以及新增模板/数据字段的步骤见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。比赛、市场和媒体材料位于 [`docs/competition/`](docs/competition/README.md)、[`docs/markets/`](docs/markets/README.md) 和 [`docs/media/`](docs/media/README.md)。
 

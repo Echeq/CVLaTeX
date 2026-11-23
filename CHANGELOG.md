@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-23
+
 ### Fixed
 
 - Tabbed now starts the logo/photo media column on the same row as the name.
@@ -324,6 +326,7 @@ with no account and no server.
   Linux and a `.zip` containing `CVLaTex.app` on macOS. There is no installer,
   package repository, auto-updater or universal macOS binary.
 
+[1.0.1]: https://github.com/Echeq/CVLaTex/releases/tag/v1.0.1
 [1.0.0]: https://github.com/Echeq/CVLaTex/releases/tag/v1.0.0
 [0.3.0]: https://github.com/Echeq/CVLaTex/releases/tag/v0.3.0
 [0.2.1]: https://github.com/Echeq/CVLaTex/releases/tag/v0.2.1

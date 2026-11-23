@@ -121,16 +121,19 @@ def _latest_changelog_section():
 
 
 def test_changelog_documents_known_limitations():
-    section = _latest_changelog_section()
-    for heading in ("### Added", "### Changed", "### Fixed", "### Known limitations"):
-        assert heading in section, heading
+    changelog = _read(CHANGELOG)
+    latest = _latest_changelog_section()
+    assert any(
+        heading in latest for heading in ("### Added", "### Changed", "### Fixed")
+    ), "the latest release section has no change entries"
+    assert "### Known limitations" in changelog
     for phrase in (
         "unsigned",
         "WebKitGTK 4.1",
         "PDF compile tests skip",
         "archive-based",
     ):
-        assert phrase in section, phrase
+        assert phrase in changelog, phrase
 
 
 def test_requirements_use_exact_pins():
@@ -262,7 +265,7 @@ def test_readme_documents_release_assets():
     assert "## Download" in readme
     assert "## Releases" in readme
     assert "## Installation" in readme
-    assert "v%s is the first stable release" % VERSION in readme
+    assert "v%s is the latest stable release" % VERSION in readme
 
     base = "https://github.com/Echeq/CVLaTex/releases/download/v%s/" % VERSION
     for asset in (

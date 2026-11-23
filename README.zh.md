@@ -89,6 +89,20 @@ python -m venv .venv
 5. 该构建仅支持 **Apple Silicon（arm64）**，不支持 Intel Mac。
 6. 如需 PDF 预览/导出，允许应用安装 TinyTeX。
 
+如果 macOS 提示 **“CVLaTeX.app is damaged and can’t be opened”**，这不是文件损坏，而是未签名应用的 Gatekeeper 隔离。先核对 SHA-256，然后运行：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/CVLaTeX.app
+```
+
+如果仍无法打开：
+
+```bash
+sudo codesign --force --deep --sign - /Applications/CVLaTeX.app
+sudo xattr -cr /Applications/CVLaTeX.app
+open /Applications/CVLaTeX.app
+```
+
 **方式 B — Python 源码**
 
 要求：Python 3.12 和 Git。PDF 预览/导出需要 LaTeX，但可以在应用内安装 TinyTeX。

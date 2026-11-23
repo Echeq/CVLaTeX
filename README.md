@@ -79,6 +79,20 @@ python -m venv .venv
 5. This build is **Apple Silicon (arm64) only**; Intel Macs are not supported.
 6. Let the app install TinyTeX if you want PDF preview/export.
 
+If macOS says **“CVLaTeX.app is damaged and can’t be opened”**, the download is not corrupt: it is Gatekeeper quarantine on an unsigned build. Verify the SHA-256 first, then run:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/CVLaTeX.app
+```
+
+If it still refuses to open:
+
+```bash
+sudo codesign --force --deep --sign - /Applications/CVLaTeX.app
+sudo xattr -cr /Applications/CVLaTeX.app
+open /Applications/CVLaTeX.app
+```
+
 **Option B — Python source**
 
 Requirements: Python 3.12 and Git. LaTeX is optional for PDF preview/export.

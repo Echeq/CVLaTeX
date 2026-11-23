@@ -82,6 +82,8 @@ def test_both_readmes_show_binary_and_python_paths():
     for command in ("CVLaTeX.exe", "CVLaTeX.app", "./CVLaTeX"):
         assert command in english
         assert command in chinese
+    assert "xattr -dr com.apple.quarantine" in english
+    assert "xattr -dr com.apple.quarantine" in chinese
 
     media = _read("docs", "media", "README.md")
     assert "[Insert:Image:{" in media

@@ -42,8 +42,6 @@ PDF、Word 或 LaTeX 源码，内置 12 套模板并支持中文简历。无需�
 
 45-second demo: first run, sample CV, Chinese template, photo crop and exports.
 
-Demo script and shot list: [`demo-script.md`](demo-script.md).
-
 ## Screenshots
 
 [Insert:Image:{Template gallery: Classic, Harvard, Modern, Chinese}]

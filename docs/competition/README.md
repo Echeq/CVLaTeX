@@ -41,7 +41,6 @@ PDF、Word 或 LaTeX 源码，内置 12 套模板并支持中文简历。无需�
 [![Watch the CVLaTeX demo](../media/images/demo-poster.png)](https://echeq.github.io/CVLaTeX/demo.html)
 
 45-second demo: first run, sample CV, Chinese template, photo crop and exports.
-The full 2–3 minute walkthrough is still pending for the final submission.
 
 Demo script and shot list: [`demo-script.md`](demo-script.md).
 
@@ -91,7 +90,7 @@ conventions and the closest app settings:
 
 ## Quality evidence
 
-- **1027 tests pass** with a LaTeX engine available (918 in the fast suite);
+- **1031 tests pass** with a LaTeX engine available (922 in the fast suite);
   the PDF compile tests are marked and skip when no engine is installed.
 - **CI on three operating systems:** Windows, Linux and macOS build native
   archives on every push; tagged releases verify the tag, archive contents and

@@ -10,11 +10,7 @@
 
 [![Watch the CVLaTeX demo](docs/media/images/demo-poster.png)](https://echeq.github.io/CVLaTeX/demo.html)
 
-**45-second demo** recorded on the v1.0 build: first run, sample CV, Chinese template, photo crop and exports. It opens in the browser with a normal video player. A longer 2–3 minute walkthrough is being prepared for the competition submission.
-
-The recording script and shot list live in
-[`docs/competition/demo-script.md`](docs/competition/demo-script.md). Media
-naming and replacement rules are in [`docs/media/README.md`](docs/media/README.md).
+**45-second demo** recorded on the v1.0 build: first run, sample CV, Chinese template, photo crop and exports. It opens in the browser with a normal video player.
 
 ## Download
 

@@ -1,12 +1,11 @@
 # Demo script — 2 to 3 minutes
 
 A shot list for the competition video. Record at 1080p or higher, keep the
-cursor visible and avoid showing personal data. Replace the placeholders when
-the final video is published.
+cursor visible and avoid showing personal data.
 
-**Reference short cut:** [demo-en.mp4](../media/videos/demo-en.mp4) (45 s,
-current build). Use it as a timing/style reference; the final competition
-video should still be 2:30–3:00.
+**Reference short cut:** [demo player](https://echeq.github.io/CVLaTeX/demo.html)
+(45 s, current build). Use it as a timing/style reference; the full competition
+video can follow the timing below.
 
 **Target length:** 2:30–3:00.
 
@@ -18,7 +17,6 @@ video should still be 2:30–3:00.
   their personal data to a website.”
 - Cut to the CVLaTeX main window.
 
-[Insert:Video:{Opening shot: CVLaTeX main window}]
 
 ## 0:20–0:50 — First run and form
 
@@ -27,7 +25,6 @@ video should still be 2:30–3:00.
 - Type a name and one achievement; the preview updates.
 - Mention: **offline, no account, no cloud**.
 
-[Insert:Video:{First run, language picker and sample CV}]
 
 ## 0:50–1:30 — Templates and markets
 
@@ -37,7 +34,6 @@ video should still be 2:30–3:00.
   (`Help → Dedicated to each market`).
 - Show A4/Letter and serif/sans/monospace controls in Settings.
 
-[Insert:Video:{Template switching and Chinese CV}]
 
 ## 1:30–2:05 — Export
 
@@ -46,7 +42,6 @@ video should still be 2:30–3:00.
 - Open the exported `.tex` and show the embedded data block.
 - Mention the lossless `.tex` round-trip: export, edit, import.
 
-[Insert:Video:{PDF, Word and LaTeX export}]
 
 ## 2:05–2:30 — Quality and closing
 
@@ -54,7 +49,6 @@ video should still be 2:30–3:00.
 - Mention MIT license, offline privacy and the TinyTeX on-demand installer.
 - Close on the logo and the repository URL.
 
-[Insert:Video:{Tests, CI and closing screen}]
 
 ## Shot list
 

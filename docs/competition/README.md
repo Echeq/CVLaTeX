@@ -1,14 +1,9 @@
-# Competition package — 2026 HUST Excellent Open Source Project
+# CVLaTeX — 2026 HUST Excellent Open Source Project
 
 > 中文项目说明：[README.zh.md](../../README.zh.md) · English: [README.md](../../README.md)
 
-Working notes and submission material for the **2026 年华中科技大学优秀开源项目
-征集与评选** (HUST Excellent Open Source Project).
-
-> **Deadline: 30 November 2026.** Register on
-> <https://ossrpp.tcode.com.cn/#/> and join the QQ group (1127737348) before
-> preparing the final material. After the shortlist, the repository must be
-> migrated to <https://git.hust.edu.cn>.
+CVLaTeX is a free, offline, cross-platform CV editor for the **2026 年华中科技大学
+优秀开源项目征集与评选** (HUST Excellent Open Source Project).
 
 ## One-liner
 
@@ -26,7 +21,7 @@ PDF、Word 或 LaTeX 源码，内置 12 套模板并支持中文简历。无需�
 ## Why it fits the call
 
 - **Original open-source software**, first published in 2026, MIT licensed.
-- **Runs on Windows, Linux and macOS**, with releases for all three platforms.
+- **Runs on Windows, Linux and macOS**, with native releases for all three.
 - **Privacy by design:** the document, photos and preferences stay on the
   user's machine; nothing is uploaded. The local UI server is token-gated and
   bound to `127.0.0.1`, uploads are size-limited and validated by magic bytes,
@@ -41,36 +36,18 @@ PDF、Word 或 LaTeX 源码，内置 12 套模板并支持中文简历。无需�
 [![Watch the CVLaTeX demo](../media/images/demo-poster.png)](https://echeq.github.io/CVLaTeX/demo.html)
 
 45-second demo: first run, sample CV, Chinese template, photo crop and exports.
-
-## Screenshots
-
-[Insert:Image:{Template gallery: Classic, Harvard, Modern, Chinese}]
-
-[Insert:Image:{Chinese CV compiled with XeLaTeX}]
-
-[Insert:Image:{Word export and LaTeX export side by side}]
-
-## Tutorials
-
-[Insert:Video:{Tutorial 1: from a blank page to the first exported PDF}]
-
-[Insert:Video:{Tutorial 2: switching templates and adapting a CV to a market}]
-
-[Insert:Video:{Tutorial 3: photos, logos and the crop editor}]
-
-[Insert:Image:{Tutorial thumbnail grid}]
+It opens in a normal browser video player.
 
 ## Architecture
 
-[Insert:Image:{Architecture diagram: web UI, pywebview bridge, LaTeX/Word generators}]
-
-The short version:
-
 - `web/` — build-less HTML/CSS/JS interface served by a loopback HTTP server.
-- `main.py` — pywebview shell plus the `Api` bridge.
+- `main.py` — pywebview shell plus the `Api` bridge and local server.
 - `latex_gen.py` / `latex_engine.py` — TeX generation and compilation.
 - `docx_gen.py` — Word export with python-docx.
 - `tex_datos.py` — embedded data block for lossless `.tex` round-trips.
+
+The same canonical data model feeds the PDF, Word and `.tex` exports, so the
+three outputs share section order, visibility, custom titles, colors and blocks.
 
 ## Market fit
 
@@ -83,8 +60,6 @@ conventions and the closest app settings:
 - [Latin America](../markets/es-LATAM.md)
 - [China](../markets/zh-CN.md)
 - [Russia](../markets/ru-RU.md)
-
-[Insert:Image:{Market matrix: paper size, photo, length and language by market}]
 
 ## Quality evidence
 
@@ -108,21 +83,17 @@ conventions and the closest app settings:
 - **No secrets or personal data** in the repository; `.cvjson`, PDFs, photos
   and local tooling are ignored.
 
+## Competition submission
+
+- **Platform registration:** <https://ossrpp.tcode.com.cn/#/>
+- **Code hosting:** <https://git.hust.edu.cn> (full migration after shortlist)
+- **Deadline:** 30 November 2026
+- **Release:** [v1.0.1](https://github.com/Echeq/CVLaTeX/releases/tag/v1.0.1)
+- **Source:** <https://github.com/Echeq/CVLaTeX>
+
 ## Roadmap
 
 - System-font selection in Preferences (requires XeLaTeX; install on demand).
 - Russian document labels for the CV itself.
 - Coverage reporting and a JavaScript test harness.
 - Signed Windows/macOS builds.
-
-## Submission checklist
-
-- [ ] Register on the platform before **30 November 2026**.
-- [ ] Join the QQ group and follow the announced rubric.
-- [ ] Publish a stable release (not a pre-release) with notes and checksums.
-- [ ] Record the 2–3 minute demo and add the screenshots.
-- [ ] Replace every `[Insert:Image:...]` / `[Insert:Video:...]` placeholder.
-- [ ] Verify the MIT license, third-party notices and the absence of personal
-      data.
-- [ ] Prepare the `git.hust.edu.cn` mirror for the shortlist stage.
-- [ ] Rehearse a 5-minute pitch: problem, demo, architecture, impact, roadmap.
